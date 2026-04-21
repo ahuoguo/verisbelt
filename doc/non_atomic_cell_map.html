@@ -1,0 +1,299 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="coqdoc.css" rel="stylesheet" type="text/css" />
+<title>non_atomic_cell_map</title>
+</head>
+
+<body>
+
+<div id="page">
+
+<div id="header">
+</div>
+
+<div id="main">
+
+<h1 class="libtitle">Library non_atomic_cell_map</h1>
+
+<div class="code">
+
+<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Non-atomic map. 
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Definition</span> <span class="id" title="var">ReadWriteState</span> := <span class="id" title="var">lock_state</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <span class="id" title="var">naN</span> : <span class="id" title="var">namespace</span> := <span class="id" title="var">nroot</span> .@ "leaf_lifetime_logic" .@ "guarding".<br/>
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <span class="id" title="var">cell_id</span> := <span class="id" title="var">positive</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Class</span> <span class="id" title="var">na_logicG</span> <span class="id" title="var">L</span> <span class="id" title="var">V</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Countable</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Inhabited</span> <span class="id" title="var">V</span>} <span class="id" title="var">Σ</span> := {<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">local</span>] <span class="id" title="var">na1_inG</span> :: <span class="id" title="var">cmap_logicG</span> <span class="id" title="var">L</span> <span class="id" title="var">cell_id</span> <span class="id" title="var">V</span> <span class="id" title="var">Σ</span> ;<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">local</span>] <span class="id" title="var">na2_inG</span> :: <span class="id" title="var">inG</span> <span class="id" title="var">Σ</span> (<span class="id" title="var">gmap_viewR</span> (<span class="id" title="var">L</span> × <span class="id" title="var">nat</span>) (<span class="id" title="var">agreeR</span> (<span class="id" title="var">laterO</span> (<span class="id" title="var">iPropO</span> <span class="id" title="var">Σ</span>)))) ;<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">local</span>] <span class="id" title="var">na3_inG</span> :: <span class="id" title="var">inG</span> <span class="id" title="var">Σ</span> (<span class="id" title="var">gmap_viewR</span> (<span class="id" title="var">L</span> × <span class="id" title="var">nat</span>) (<span class="id" title="var">agreeR</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">prodO</span> (<span class="id" title="var">leibnizO</span> (<span class="id" title="var">option</span> (<span class="id" title="var">list</span> <span class="id" title="var">cell_id</span> × <span class="id" title="var">cell_id</span>))) (<span class="id" title="var">laterO</span> (<span class="id" title="var">iPropO</span> <span class="id" title="var">Σ</span>)))<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;))<br/>
+}.<br/>
+
+<br/>
+<span class="id" title="keyword">Definition</span> <span class="id" title="var">na_logicΣ</span> <span class="id" title="var">L</span> <span class="id" title="var">V</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Countable</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Inhabited</span> <span class="id" title="var">V</span>} : <span class="id" title="var">gFunctors</span> := #[<br/>
+&nbsp;&nbsp;<span class="id" title="var">cmap_logicΣ</span> <span class="id" title="var">L</span> <span class="id" title="var">cell_id</span> <span class="id" title="var">V</span>;<br/>
+&nbsp;&nbsp;<span class="id" title="var">GFunctor</span> (<span class="id" title="var">gmap_viewRF</span> (<span class="id" title="var">L</span> × <span class="id" title="var">nat</span>) (<span class="id" title="var">agreeRF</span> (<span class="id" title="var">laterOF</span> <span class="id" title="var">idOF</span>)));<br/>
+&nbsp;&nbsp;<span class="id" title="var">GFunctor</span> (<span class="id" title="var">gmap_viewRF</span> (<span class="id" title="var">L</span> × <span class="id" title="var">nat</span>) (<span class="id" title="var">agreeRF</span> (<span class="id" title="var">prodOF</span> (<span class="id" title="var">leibnizO</span> (<span class="id" title="var">option</span> (<span class="id" title="var">list</span> <span class="id" title="var">cell_id</span> × <span class="id" title="var">cell_id</span>))) (<span class="id" title="var">laterOF</span> <span class="id" title="var">idOF</span>))))<br/>
+].<br/>
+
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">subG_na_logicΣ</span> <span class="id" title="var">L</span> <span class="id" title="var">V</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Countable</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Inhabited</span> <span class="id" title="var">V</span>} <span class="id" title="var">Σ</span> : <span class="id" title="var">subG</span> (<span class="id" title="var">na_logicΣ</span> <span class="id" title="var">L</span> <span class="id" title="var">V</span>) <span class="id" title="var">Σ</span> → <span class="id" title="var">na_logicG</span> <span class="id" title="var">L</span> <span class="id" title="var">V</span> <span class="id" title="var">Σ</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Section</span> <span class="id" title="var">NonAtomicMap</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Context</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">L</span>, !<span class="id" title="var">Countable</span> <span class="id" title="var">L</span>}.<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Context</span> `{!<span class="id" title="var">Inhabited</span> <span class="id" title="var">V</span>}.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Context</span> {<span class="id" title="var">Σ</span>: <span class="id" title="var">gFunctors</span>}.<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Context</span> `{!<span class="id" title="var">na_logicG</span> <span class="id" title="var">L</span> <span class="id" title="var">V</span> <span class="id" title="var">Σ</span>}.<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Context</span> `{!<span class="id" title="var">invGS</span> <span class="id" title="var">Σ</span>}.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Definition</span> <span class="id" title="var">points_to_seq</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> : <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>. <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Notation</span> &quot;l @↦[ ι ][^ cells ] v" := (<span class="id" title="var">points_to_seq</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="tactic">at</span> <span class="id" title="keyword">level</span> 20, <span class="id" title="var">format</span> "l  @↦[ ι ][^ cells ]  v") : <span class="id" title="var">bi_scope</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Notation</span> &quot;l @↦[ ι ] v" := (<span class="id" title="var">points_to_seq</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> [] <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="tactic">at</span> <span class="id" title="keyword">level</span> 20, <span class="id" title="var">format</span> "l  @↦[ ι ]  v") : <span class="id" title="var">bi_scope</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Definition</span> <span class="id" title="var">points_to_w_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> (<span class="id" title="var">o</span>: <span class="id" title="var">option</span> (<span class="id" title="var">list</span> <span class="id" title="var">cell_id</span> × <span class="id" title="var">cell_id</span>)) (<span class="id" title="var">G</span>: <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>) : <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>. <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Definition</span> <span class="id" title="var">points_to_r_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> <span class="id" title="var">G</span> : <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>. <br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Definition</span> <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ : <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>. <br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">points_to_timeless</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> : <span class="id" title="var">Timeless</span> (<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>).<br/>
+ 
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">non_atomic_map_alloc_empty</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;: ⊢ |==&gt; ∃ <span class="id" title="var">ι</span>, <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> ∅.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">points_to_heap_agree</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> σ :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ -∗ ⌜ ∃ <span class="id" title="var">st</span>, σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">st</span>, <span class="id" title="var">v</span>) ⌝.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">points_to_heap_reading0</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> σ <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) ∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ∗ ⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">points_to_heap_reading0_guarded_cells</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">V</span>} <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">c</span> <span class="id" title="var">v</span> σ <span class="id" title="var">E</span> <span class="id" title="var">G</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ £ <span class="id" title="var">d</span> -∗ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>;<span class="id" title="var">d</span>}&amp;&amp;&gt; <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inl</span> <span class="id" title="var">c</span>) -∗ <span class="id" title="var">G</span> -∗ (<span class="id" title="var">inr</span> <span class="id" title="var">c</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">G</span> ∗ (<span class="id" title="var">inr</span> <span class="id" title="var">c</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) ∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ∗ ⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">points_to_heap_readingN_guarded_all</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">V</span>} <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> σ <span class="id" title="var">E</span> <span class="id" title="var">G</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ £ <span class="id" title="var">d</span> -∗ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>;<span class="id" title="var">d</span>}&amp;&amp;&gt; <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗ <span class="id" title="var">G</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">G</span> ∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ∗ ⌜ ∃ <span class="id" title="var">n</span>, σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> <span class="id" title="var">n</span>, <span class="id" title="var">v</span>) ⌝.<br/>
+
+<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">na_write_begin</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> σ <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">points_to_w_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">None</span> <span class="id" title="var">True</span>%<span class="id" title="var">I</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">WSt</span>, <span class="id" title="var">v</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">na_write_begin_guarded_cells</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">V</span>} <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">c</span> <span class="id" title="var">v</span> σ <span class="id" title="var">E</span> <span class="id" title="var">G</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ £(3*<span class="id" title="var">d</span>) -∗ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>;<span class="id" title="var">d</span>}&amp;&amp;&gt; <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inl</span> <span class="id" title="var">c</span>) -∗ <span class="id" title="var">G</span> -∗ (<span class="id" title="var">inr</span> <span class="id" title="var">c</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">points_to_w_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> (<span class="id" title="var">Some</span> (<span class="id" title="var">cells</span>, <span class="id" title="var">c</span>)) <span class="id" title="var">G</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">WSt</span>, <span class="id" title="var">v</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">na_write_finish</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v'</span> σ <span class="id" title="var">G</span> <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ <span class="id" title="var">points_to_w_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">None</span> <span class="id" title="var">G</span> -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ ∃ <span class="id" title="var">v</span>, σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">WSt</span>, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v'</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v'</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">na_write_finish_guarded_cells</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">c</span> <span class="id" title="var">v'</span> σ <span class="id" title="var">E</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ <span class="id" title="var">points_to_w_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> (<span class="id" title="var">Some</span> (<span class="id" title="var">cells</span>, <span class="id" title="var">c</span>)) <span class="id" title="var">G</span> -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ -∗ ▷ |={<span class="id" title="var">E</span>}=&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ ∃ <span class="id" title="var">v</span>, σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">WSt</span>, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">G</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">inr</span> <span class="id" title="var">c</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v'</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v'</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">na_read_begin</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">V</span>} <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> σ <span class="id" title="var">G</span> <span class="id" title="var">d</span> <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ £(3*<span class="id" title="var">d</span>) -∗ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>;<span class="id" title="var">d</span>}&amp;&amp;&gt; (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>)) -∗ <span class="id" title="var">G</span> -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃ <span class="id" title="var">n</span> , ⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> <span class="id" title="var">n</span>, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">points_to_r_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> <span class="id" title="var">G</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> (<span class="id" title="var">n</span> + 1), <span class="id" title="var">v</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">na_read_end</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> σ <span class="id" title="var">G</span> <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">points_to_r_intermediate</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> <span class="id" title="var">G</span> -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ -∗ ▷ |={<span class="id" title="var">E</span>}=&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃ <span class="id" title="var">n</span> , ⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> <span class="id" title="var">n</span>, <span class="id" title="var">v</span>) ∧ <span class="id" title="var">n</span> ≥ 1 ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">G</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> (<span class="id" title="var">n</span> - 1), <span class="id" title="var">v</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">atomic_write</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> σ <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v'</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v'</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">atomic_write_guarded_cells</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">V</span>} <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> <span class="id" title="var">cells</span> <span class="id" title="var">c</span> <span class="id" title="var">v'</span> σ <span class="id" title="var">E</span> <span class="id" title="var">G</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;⊢ £(3*<span class="id" title="var">d</span>) -∗ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>;<span class="id" title="var">d</span>}&amp;&amp;&gt; <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inl</span> <span class="id" title="var">c</span>) -∗ <span class="id" title="var">G</span> -∗ (<span class="id" title="var">inr</span> <span class="id" title="var">c</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ -∗ |={<span class="id" title="var">E</span>}=&gt; ▷ |={<span class="id" title="var">E</span>}=&gt;<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">G</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ (<span class="id" title="var">inr</span> <span class="id" title="var">c</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v'</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v'</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">atomic_read</span> `{!<span class="id" title="var">EqDecision</span> <span class="id" title="var">V</span>} <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span> σ <span class="id" title="var">G</span> <span class="id" title="var">E</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;£(<span class="id" title="var">d</span>) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>;<span class="id" title="var">d</span>}&amp;&amp;&gt; (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>)) -∗ <span class="id" title="var">G</span> -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃ <span class="id" title="var">n</span> , ⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> <span class="id" title="var">n</span>, <span class="id" title="var">v</span>) ⌝<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ <span class="id" title="var">G</span> ∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">non_atomic_map_insert</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> σ :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(σ !! <span class="id" title="var">l</span> = <span class="id" title="var">None</span>) →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ==∗ (<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) ∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (&lt;[ <span class="id" title="var">l</span> := (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ]&gt; σ).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">non_atomic_map_delete</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> σ <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span>) -∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> σ ={<span class="id" title="var">E</span>}=∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⌜ σ !! <span class="id" title="var">l</span> = <span class="id" title="var">Some</span> (<span class="id" title="var">RSt</span> 0, <span class="id" title="var">v</span>) ⌝ ∗ <span class="id" title="var">non_atomic_map</span> <span class="id" title="var">ι</span> (<span class="id" title="var">delete</span> <span class="id" title="var">l</span> σ).<br/>
+
+<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+cell stuff 
+</div>
+<div class="code">
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_cons</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cell</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cell</span> :: <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span> ⊣⊢ <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ∗ (<span class="id" title="var">inr</span> <span class="id" title="var">cell</span>) @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_cons_and</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cell</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ∧ (<span class="id" title="var">inr</span> <span class="id" title="var">cell</span>) @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] <span class="id" title="var">cv</span> ⊢ <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cell</span> :: <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_cons_back_and</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cell</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ∧ (<span class="id" title="var">inr</span> <span class="id" title="var">cell</span>) @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">cv</span> ⊢ <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span> ++ [<span class="id" title="var">cell</span>]] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_snoc</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cell</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span> ++ [<span class="id" title="var">cell</span>]] <span class="id" title="var">cv</span> ⊣⊢ <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] <span class="id" title="var">inl</span> <span class="id" title="var">cell</span> ∗ <span class="id" title="var">inr</span> <span class="id" title="var">cell</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_app_and</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells1</span> <span class="id" title="var">cell</span> <span class="id" title="var">cells2</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells1</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ∧ (<span class="id" title="var">inr</span> <span class="id" title="var">cell</span>) @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells2</span>] <span class="id" title="var">cv</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⊣⊢ <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells1</span> ++ <span class="id" title="var">cell</span> :: <span class="id" title="var">cells2</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_app_sep</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells1</span> <span class="id" title="var">cell</span> <span class="id" title="var">cells2</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells1</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ∗ (<span class="id" title="var">inr</span> <span class="id" title="var">cell</span>) @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells2</span>] <span class="id" title="var">cv</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⊣⊢ <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells1</span> ++ <span class="id" title="var">cell</span> :: <span class="id" title="var">cells2</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_andM_sepM</span> <span class="id" title="var">ι</span> (<span class="id" title="var">rows</span>: <span class="id" title="var">gmap</span> <span class="id" title="var">L</span> ((<span class="id" title="var">list</span> <span class="id" title="var">cell_id</span>) × (<span class="id" title="var">cell_id</span> + <span class="id" title="var">V</span>))) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;([∧ <span class="id" title="var">map</span>] <span class="id" title="var">l</span> ↦ '(<span class="id" title="var">cells</span>, <span class="id" title="var">cv</span>) ∈ <span class="id" title="var">rows</span>, (<span class="id" title="var">inl</span> <span class="id" title="var">l</span>) @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>)%<span class="id" title="var">I</span> ⊢<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[∗ <span class="id" title="var">map</span>] <span class="id" title="var">l</span> ↦ '(<span class="id" title="var">cells</span>, <span class="id" title="var">cv</span>) ∈ <span class="id" title="var">rows</span>, (<span class="id" title="var">inl</span> <span class="id" title="var">l</span>) @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Local Lemma</span> <span class="id" title="var">pt_untether'</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cell</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ==∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃ (<span class="id" title="var">v</span>: <span class="id" title="var">V</span>), <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>] (<span class="id" title="var">inr</span> <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ (∀ <span class="id" title="var">l</span> <span class="id" title="var">cells</span>, <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span> ==∗ <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inl</span> <span class="id" title="var">cell</span>).<br/>
+ 
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_untether</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells</span> <span class="id" title="var">cell</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] (<span class="id" title="var">inl</span> <span class="id" title="var">cell</span>) ==∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃ (<span class="id" title="var">v</span>: <span class="id" title="var">V</span>), <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^<span class="id" title="var">cells</span>] (<span class="id" title="var">inr</span> <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∗ (∀ <span class="id" title="var">l</span> <span class="id" title="var">cells</span>, <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inr</span> <span class="id" title="var">v</span> ==∗ <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">inl</span> <span class="id" title="var">cell</span>).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_seq_point_prop</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">factoring_props.point_prop</span> (<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>).<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_alloc_cell'</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>] <span class="id" title="var">cv</span> ==∗ ∃ <span class="id" title="var">c</span>, <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ [<span class="id" title="var">c</span>]] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_alloc_cell</span> <span class="id" title="var">ι</span> <span class="id" title="var">lc</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span> ==∗ ∃ <span class="id" title="var">c</span>, <span class="id" title="var">lc</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">c</span> :: <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+&nbsp;&nbsp;<span class="id" title="keyword">Lemma</span> <span class="id" title="var">pt_delete_cell</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">cells</span> <span class="id" title="var">cv</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">c</span> :: <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span> ==∗ <span class="id" title="var">inl</span> <span class="id" title="var">l</span> @↦[<span class="id" title="var">ι</span>][^ <span class="id" title="var">cells</span>] <span class="id" title="var">cv</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">End</span> <span class="id" title="var">NonAtomicMap</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Global Notation</span> &quot;l @↦[ ι ][^ cells ] v" := (<span class="id" title="var">points_to_seq</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="tactic">at</span> <span class="id" title="keyword">level</span> 20, <span class="id" title="var">format</span> "l  @↦[ ι ][^ cells ]  v") : <span class="id" title="var">bi_scope</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Global Notation</span> &quot;l @↦[ ι ] v" := (<span class="id" title="var">points_to_seq</span> <span class="id" title="var">ι</span> <span class="id" title="var">l</span> [] <span class="id" title="var">v</span>)<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="tactic">at</span> <span class="id" title="keyword">level</span> 20, <span class="id" title="var">format</span> "l  @↦[ ι ]  v") : <span class="id" title="var">bi_scope</span>.<br/>
+</div>
+</div>
+
+<div id="footer">
+<hr/><a href="index.html">Index</a><hr/>This page has been generated by <a href="http://coq.inria.fr/">coqdoc</a>
+</div>
+
+</div>
+
+</body>
+</html>

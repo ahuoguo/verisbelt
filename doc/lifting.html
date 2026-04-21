@@ -1,0 +1,453 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="coqdoc.css" rel="stylesheet" type="text/css" />
+<title>lifting</title>
+</head>
+
+<body>
+
+<div id="page">
+
+<div id="header">
+</div>
+
+<div id="main">
+
+<h1 class="libtitle">Library lifting</h1>
+
+<div class="code">
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">Class</span> <span class="id" title="var">lrustGS</span> <span class="id" title="var">Σ</span> := <span class="id" title="var">LRustGS</span> {<br/>
+&nbsp;&nbsp;<span class="id" title="var">lrustGS_invGS</span> : <span class="id" title="var">invGS</span> <span class="id" title="var">Σ</span>;<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">lrustGS_na_invGS</span> :: <span class="id" title="var">na_invG</span> <span class="id" title="var">Σ</span>;<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">lrustGS_atomic_lock_ctr_invGS</span> :: <span class="id" title="var">alc_logicG</span> <span class="id" title="var">Σ</span>;<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">lrustGS_gen_heapGS</span> :: <span class="id" title="var">heapGS</span> <span class="id" title="var">Σ</span>;<br/>
+&nbsp;&nbsp;#[<span class="id" title="var">global</span>] <span class="id" title="var">lrustGS_gen_timeGS</span> :: <span class="id" title="var">timeGS</span> <span class="id" title="var">Σ</span><br/>
+}.<br/>
+
+<br/>
+<span class="id" title="keyword">Global Program Instance</span> <span class="id" title="var">lrustGS_irisGS</span> `{!<span class="id" title="var">lrustGS</span> <span class="id" title="var">Σ</span>} : <span class="id" title="var">irisGS</span> <span class="id" title="var">lrust_lang</span> <span class="id" title="var">Σ</span> := {<br/>
+&nbsp;&nbsp;<span class="id" title="var">iris_invGS</span> := <span class="id" title="var">lrustGS_invGS</span>;<br/>
+&nbsp;&nbsp;<span class="id" title="var">state_interp</span> σ <span class="id" title="var">stepcnt</span> <span class="id" title="var">κs</span> <span class="id" title="var">_</span> := (@<span class="id" title="var">heap_ctx</span> <span class="id" title="var">Σ</span> <span class="id" title="var">_</span> <span class="id" title="var">lrustGS_invGS</span> <span class="id" title="var">lrustGS_na_invGS</span> <span class="id" title="var">lrustGS_atomic_lock_ctr_invGS</span> σ ∗ <span class="id" title="var">time_interp</span> <span class="id" title="var">stepcnt</span>)%<span class="id" title="var">I</span>;<br/>
+&nbsp;&nbsp;<span class="id" title="var">fork_post</span> <span class="id" title="var">_</span> := <span class="id" title="var">True</span>%<span class="id" title="var">I</span>;<br/>
+&nbsp;&nbsp;<span class="id" title="var">num_laters_per_step</span> <span class="id" title="var">n</span> := (<span class="id" title="var">sum_advance_credits</span> (<span class="id" title="var">n</span> + 1))%<span class="id" title="var">nat</span><br/>
+}.<br/>
+
+<br/>
+
+<br/>
+
+<br/>
+
+<br/>
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">Class</span> <span class="id" title="var">AsRec</span> (<span class="id" title="var">e</span> : <span class="id" title="var">expr</span>) (<span class="id" title="var">f</span> : <span class="id" title="var">binder</span>) (<span class="id" title="var">xl</span> : <span class="id" title="var">list</span> <span class="id" title="var">binder</span>) (<span class="id" title="var">erec</span> : <span class="id" title="var">expr</span>) :=<br/>
+&nbsp;&nbsp;<span class="id" title="var">as_rec</span> : <span class="id" title="var">e</span> = <span class="id" title="var">Rec</span> <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">erec</span>.<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">AsRec_rec</span> <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">e</span> : <span class="id" title="var">AsRec</span> (<span class="id" title="var">Rec</span> <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">e</span>) <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">e</span> := <span class="id" title="var">eq_refl</span>.<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">AsRec_rec_locked_val</span> <span class="id" title="var">v</span> <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">e</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">AsRec</span> (<span class="id" title="var">of_val</span> <span class="id" title="var">v</span>) <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">e</span> → <span class="id" title="var">AsRec</span> (<span class="id" title="var">of_val</span> (<span class="id" title="var">locked</span> <span class="id" title="var">v</span>)) <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">e</span>.<br/>
+ 
+<br/>
+<span class="id" title="keyword">Class</span> <span class="id" title="var">DoSubst</span> (<span class="id" title="var">x</span> : <span class="id" title="var">binder</span>) (<span class="id" title="var">es</span> : <span class="id" title="var">expr</span>) (<span class="id" title="var">e</span> <span class="id" title="var">er</span> : <span class="id" title="var">expr</span>) :=<br/>
+&nbsp;&nbsp;<span class="id" title="var">do_subst</span> : <span class="id" title="var">subst'</span> <span class="id" title="var">x</span> <span class="id" title="var">es</span> <span class="id" title="var">e</span> = <span class="id" title="var">er</span>.<br/>
+
+<br/>
+<span class="id" title="keyword">Class</span> <span class="id" title="var">DoSubstL</span> (<span class="id" title="var">xl</span> : <span class="id" title="var">list</span> <span class="id" title="var">binder</span>) (<span class="id" title="var">esl</span> : <span class="id" title="var">list</span> <span class="id" title="var">expr</span>) (<span class="id" title="var">e</span> <span class="id" title="var">er</span> : <span class="id" title="var">expr</span>) :=<br/>
+&nbsp;&nbsp;<span class="id" title="var">do_subst_l</span> : <span class="id" title="var">subst_l</span> <span class="id" title="var">xl</span> <span class="id" title="var">esl</span> <span class="id" title="var">e</span> = <span class="id" title="var">Some</span> <span class="id" title="var">er</span>.<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">do_subst_l_nil</span> <span class="id" title="var">e</span> : <span class="id" title="var">DoSubstL</span> [] [] <span class="id" title="var">e</span> <span class="id" title="var">e</span>.<br/>
+ <span class="id" title="keyword">Global Instance</span> <span class="id" title="var">do_subst_l_cons</span> <span class="id" title="var">x</span> <span class="id" title="var">xl</span> <span class="id" title="var">es</span> <span class="id" title="var">esl</span> <span class="id" title="var">e</span> <span class="id" title="var">er</span> <span class="id" title="var">er'</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">DoSubstL</span> <span class="id" title="var">xl</span> <span class="id" title="var">esl</span> <span class="id" title="var">e</span> <span class="id" title="var">er'</span> → <span class="id" title="var">DoSubst</span> <span class="id" title="var">x</span> <span class="id" title="var">es</span> <span class="id" title="var">er'</span> <span class="id" title="var">er</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">DoSubstL</span> (<span class="id" title="var">x</span> :: <span class="id" title="var">xl</span>) (<span class="id" title="var">es</span> :: <span class="id" title="var">esl</span>) <span class="id" title="var">e</span> <span class="id" title="var">er</span>.<br/>
+ <span class="id" title="keyword">Global Instance</span> <span class="id" title="var">do_subst_vec</span> <span class="id" title="var">xl</span> (<span class="id" title="var">vsl</span> : <span class="id" title="var">vec</span> <span class="id" title="var">val</span> (<span class="id" title="var">length</span> <span class="id" title="var">xl</span>)) <span class="id" title="var">e</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">DoSubstL</span> <span class="id" title="var">xl</span> (<span class="id" title="var">of_val</span> &lt;$&gt; <span class="id" title="var">vec_to_list</span> <span class="id" title="var">vsl</span>) <span class="id" title="var">e</span> (<span class="id" title="var">subst_v</span> <span class="id" title="var">xl</span> <span class="id" title="var">vsl</span> <span class="id" title="var">e</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Section</span> <span class="id" title="var">lifting</span>.<br/>
+<span class="id" title="keyword">Context</span> `{!<span class="id" title="var">lrustGS</span> <span class="id" title="var">Σ</span>}.<br/>
+<span class="id" title="keyword">Implicit</span> <span class="id" title="keyword">Types</span> <span class="id" title="var">P</span> <span class="id" title="var">Q</span> : <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>.<br/>
+<span class="id" title="keyword">Implicit</span> <span class="id" title="keyword">Types</span> <span class="id" title="var">e</span> : <span class="id" title="var">expr</span>.<br/>
+<span class="id" title="keyword">Implicit</span> <span class="id" title="keyword">Types</span> <span class="id" title="var">ef</span> : <span class="id" title="var">option</span> <span class="id" title="var">expr</span>.<br/>
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">sqr_bound</span> (<span class="id" title="var">n</span>: <span class="id" title="var">nat</span>) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(2 ^ (<span class="id" title="var">S</span> <span class="id" title="var">n</span>) × 2^ (<span class="id" title="var">S</span> <span class="id" title="var">n</span>) ≤ (<span class="id" title="var">sum_advance_credits</span> (<span class="id" title="var">n</span> + 1))).<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">Sexp_le_exp_S_lemma</span> (<span class="id" title="var">n</span>: <span class="id" title="var">nat</span>) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">S</span> (2 ^ (<span class="id" title="var">S</span> <span class="id" title="var">n</span>))) ≤ (2 ^ (<span class="id" title="var">S</span> (<span class="id" title="var">S</span> <span class="id" title="var">n</span>))).<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">sqr_bound'</span> (<span class="id" title="var">n</span>: <span class="id" title="var">nat</span>) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;((2 ^ (<span class="id" title="var">S</span> (<span class="id" title="var">S</span> <span class="id" title="var">n</span>))) × ((2^ (<span class="id" title="var">S</span> (<span class="id" title="var">S</span> <span class="id" title="var">n</span>)))) ≤ (<span class="id" title="var">sum_advance_credits</span> (<span class="id" title="var">n</span> + 1))).<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">sqr_bound''</span> (<span class="id" title="var">n</span>: <span class="id" title="var">nat</span>) :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">S</span> (2 ^ (<span class="id" title="var">S</span> <span class="id" title="var">n</span>)) × (<span class="id" title="var">S</span> (2^ (<span class="id" title="var">S</span> <span class="id" title="var">n</span>))) ≤ (<span class="id" title="var">sum_advance_credits</span> (<span class="id" title="var">n</span> + 1))).<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_step_fupdN_time_receipt</span> <span class="id" title="var">n</span> <span class="id" title="var">m</span> <span class="id" title="var">E1</span> <span class="id" title="var">E2</span> <span class="id" title="var">e</span> <span class="id" title="var">P</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → <span class="id" title="var">E2</span> ⊆ <span class="id" title="var">E1</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E1</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗ ⧖<span class="id" title="var">n</span> -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(⧗<span class="id" title="var">m</span> ∧ ((|={<span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>,∅}=&gt; |={∅}▷=&gt;^(<span class="id" title="var">S</span> ((<span class="id" title="var">n</span> + <span class="id" title="var">m</span>) × (<span class="id" title="var">n</span> + <span class="id" title="var">m</span>))) |={∅,<span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>}=&gt; <span class="id" title="var">P</span>) ∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E2</span> {{ <span class="id" title="var">v</span>, <span class="id" title="var">P</span> ={<span class="id" title="var">E1</span>}=∗ <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }})) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E1</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_step_fupdN_time_receipt'</span> <span class="id" title="var">n</span> <span class="id" title="var">m</span> <span class="id" title="var">E1</span> <span class="id" title="var">E2</span> <span class="id" title="var">e</span> <span class="id" title="var">P</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → <span class="id" title="var">E2</span> ⊆ <span class="id" title="var">E1</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E1</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗ ⧖<span class="id" title="var">n</span> -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(⧗<span class="id" title="var">m</span> ∧ ((|={<span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>,∅}=&gt; |={∅}▷=&gt;^((<span class="id" title="var">S</span> ((<span class="id" title="var">S</span> (<span class="id" title="var">n</span> + <span class="id" title="var">m</span>)) × <span class="id" title="var">S</span> (<span class="id" title="var">n</span> + <span class="id" title="var">m</span>)))) |={∅,<span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>}=&gt; <span class="id" title="var">P</span>) ∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E2</span> {{ <span class="id" title="var">v</span>, <span class="id" title="var">P</span> ={<span class="id" title="var">E1</span>}=∗ <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }})) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E1</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_step_fupdN_persistent_time_receipt</span> <span class="id" title="var">n</span> <span class="id" title="var">E1</span> <span class="id" title="var">E2</span> <span class="id" title="var">e</span> <span class="id" title="var">P</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → <span class="id" title="var">E2</span> ⊆ <span class="id" title="var">E1</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E1</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗ ⧖<span class="id" title="var">n</span> -∗ (|={<span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>,∅}=&gt; |={∅}▷=&gt;^(<span class="id" title="var">S</span> (<span class="id" title="var">n</span> × <span class="id" title="var">n</span>)) |={∅, <span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>}=&gt; <span class="id" title="var">P</span>) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E2</span> {{ <span class="id" title="var">v</span>, <span class="id" title="var">P</span> ={<span class="id" title="var">E1</span>}=∗ <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }} -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E1</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+ 
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_step_fupdN_persistent_time_receipt'</span> <span class="id" title="var">n</span> <span class="id" title="var">E1</span> <span class="id" title="var">E2</span> <span class="id" title="var">e</span> <span class="id" title="var">P</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → <span class="id" title="var">E2</span> ⊆ <span class="id" title="var">E1</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E1</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗ ⧖<span class="id" title="var">n</span> -∗ (|={<span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>,∅}=&gt; |={∅}▷=&gt;^(<span class="id" title="var">S</span> ((<span class="id" title="var">S</span> <span class="id" title="var">n</span>) × (<span class="id" title="var">S</span> <span class="id" title="var">n</span>))) |={∅, <span class="id" title="var">E1</span>∖<span class="id" title="var">E2</span>}=&gt; <span class="id" title="var">P</span>) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E2</span> {{ <span class="id" title="var">v</span>, <span class="id" title="var">P</span> ={<span class="id" title="var">E1</span>}=∗ <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }} -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E1</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+ 
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cumulative_time_receipt_linear</span> <span class="id" title="var">E</span> <span class="id" title="var">e</span> <span class="id" title="var">Φ</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗<br/>
+&nbsp;&nbsp;⧖<span class="id" title="var">d</span> -∗<br/>
+&nbsp;&nbsp;(⧗(<span class="id" title="var">S</span> (<span class="id" title="var">S</span> <span class="id" title="var">d</span>)) -∗ <span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ (<span class="id" title="var">E</span>∖↑<span class="id" title="var">advN</span>) {{ <span class="id" title="var">v</span>, <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }}) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cumulative_time_receipt2</span> <span class="id" title="var">E</span> <span class="id" title="var">e</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗<br/>
+&nbsp;&nbsp;(⧗2 -∗ <span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ (<span class="id" title="var">E</span>∖↑<span class="id" title="var">advN</span>) {{ <span class="id" title="var">v</span>, <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }}) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cumulative_time_receipt1</span> <span class="id" title="var">E</span> <span class="id" title="var">e</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗ <br/>
+&nbsp;&nbsp;(⧗1 -∗ <span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ (<span class="id" title="var">E</span>∖↑<span class="id" title="var">advN</span>) {{ <span class="id" title="var">v</span>, <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }}) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_persistent_time_receipt</span> <span class="id" title="var">n</span> <span class="id" title="var">E</span> <span class="id" title="var">e</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCEq</span> (<span class="id" title="var">to_val</span> <span class="id" title="var">e</span>) <span class="id" title="var">None</span> → ↑<span class="id" title="var">advN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗<br/>
+&nbsp;&nbsp;⧖<span class="id" title="var">n</span> -∗<br/>
+&nbsp;&nbsp;(£(<span class="id" title="var">advance_credits</span> <span class="id" title="var">n</span>) -∗ ⧖(<span class="id" title="var">S</span> <span class="id" title="var">n</span>) -∗ <span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ (<span class="id" title="var">E</span>∖↑<span class="id" title="var">advN</span>) {{ <span class="id" title="var">v</span>, <span class="id" title="var">Φ</span> <span class="id" title="var">v</span> }}) -∗<br/>
+&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Base axioms for core primitives of the language: Stateless reductions 
+</div>
+<div class="code">
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_fork</span> <span class="id" title="var">E</span> <span class="id" title="var">e</span> :<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">WP</span> <span class="id" title="var">e</span> {{ <span class="id" title="var">_</span>, <span class="id" title="var">True</span> }} }}} <span class="id" title="var">Fork</span> <span class="id" title="var">e</span> @ <span class="id" title="var">E</span> {{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; <span class="id" title="var">True</span> }}}.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Pure reductions 
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_rec</span> <span class="id" title="var">e</span> <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">erec</span> <span class="id" title="var">erec'</span> <span class="id" title="var">el</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">AsRec</span> <span class="id" title="var">e</span> <span class="id" title="var">f</span> <span class="id" title="var">xl</span> <span class="id" title="var">erec</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">TCForall</span> <span class="id" title="var">AsVal</span> <span class="id" title="var">el</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">Closed</span> (<span class="id" title="var">f</span> :<span class="id" title="var">b</span>: <span class="id" title="var">xl</span> +<span class="id" title="var">b</span>+ []) <span class="id" title="var">erec</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">DoSubstL</span> (<span class="id" title="var">f</span> :: <span class="id" title="var">xl</span>) (<span class="id" title="var">e</span> :: <span class="id" title="var">el</span>) <span class="id" title="var">erec</span> <span class="id" title="var">erec'</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">App</span> <span class="id" title="var">e</span> <span class="id" title="var">el</span>) <span class="id" title="var">erec'</span>.<br/>
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_le</span> <span class="id" title="var">n1</span> <span class="id" title="var">n2</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">LeOp</span> (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">n1</span>)) (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">n2</span>)))<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(<span class="id" title="var">Lit</span> (<span class="id" title="var">bool_decide</span> (<span class="id" title="var">n1</span> ≤ <span class="id" title="var">n2</span>))).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_eq_int</span> <span class="id" title="var">n1</span> <span class="id" title="var">n2</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">EqOp</span> (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">n1</span>)) (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">n2</span>))) (<span class="id" title="var">Lit</span> (<span class="id" title="var">bool_decide</span> (<span class="id" title="var">n1</span> = <span class="id" title="var">n2</span>))).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_eq_loc_0_r</span> <span class="id" title="var">l</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">EqOp</span> (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>)) (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitInt</span> 0))) (<span class="id" title="var">Lit</span> <span class="id" title="var">false</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_eq_loc_0_l</span> <span class="id" title="var">l</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">EqOp</span> (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitInt</span> 0)) (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>))) (<span class="id" title="var">Lit</span> <span class="id" title="var">false</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_plus</span> <span class="id" title="var">z1</span> <span class="id" title="var">z2</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">PlusOp</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z2</span>)) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> $ <span class="id" title="var">z1</span> + <span class="id" title="var">z2</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_minus</span> <span class="id" title="var">z1</span> <span class="id" title="var">z2</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">MinusOp</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z2</span>)) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> $ <span class="id" title="var">z1</span> - <span class="id" title="var">z2</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_mult</span> <span class="id" title="var">z1</span> <span class="id" title="var">z2</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">MultOp</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z2</span>)) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> $ <span class="id" title="var">z1</span> × <span class="id" title="var">z2</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_offset</span> <span class="id" title="var">l</span> <span class="id" title="var">z</span>  :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">BinOp</span> <span class="id" title="var">OffsetOp</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z</span>)) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> $ <span class="id" title="var">l</span> +ₗ <span class="id" title="var">z</span>).<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_case</span> <span class="id" title="var">i</span> <span class="id" title="var">e</span> <span class="id" title="var">el</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> (0 ≤ <span class="id" title="var">i</span> ∧ <span class="id" title="var">el</span> !! (<span class="id" title="var">Z.to_nat</span> <span class="id" title="var">i</span>) = <span class="id" title="var">Some</span> <span class="id" title="var">e</span>) 1 (<span class="id" title="var">Case</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">i</span>) <span class="id" title="var">el</span>) <span class="id" title="var">e</span> | 10.<br/>
+ 
+<br/>
+<span class="id" title="keyword">Global Instance</span> <span class="id" title="var">pure_if</span> <span class="id" title="var">b</span> <span class="id" title="var">e1</span> <span class="id" title="var">e2</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">PureExec</span> <span class="id" title="var">True</span> 1 (<span class="id" title="var">If</span> (<span class="id" title="var">Lit</span> (<span class="id" title="var">lit_of_bool</span> <span class="id" title="var">b</span>)) <span class="id" title="var">e1</span> <span class="id" title="var">e2</span>) (<span class="id" title="keyword">if</span> <span class="id" title="var">b</span> <span class="id" title="keyword">then</span> <span class="id" title="var">e1</span> <span class="id" title="keyword">else</span> <span class="id" title="var">e2</span>) | 1.<br/>
+ 
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_nd_int</span> <span class="id" title="var">E</span> :<br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">True</span> }}} <span class="id" title="var">NdInt</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">z</span>, <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z</span>; <span class="id" title="var">True</span> }}}.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Heap 
+</div>
+<div class="code">
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_alloc</span> <span class="id" title="var">E</span> (<span class="id" title="var">n</span> : <span class="id" title="var">Z</span>) :<br/>
+&nbsp;&nbsp;0 &lt; <span class="id" title="var">n</span> →<br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">True</span> }}} <span class="id" title="var">Alloc</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">n</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">l</span> (<span class="id" title="var">sz</span>: <span class="id" title="var">nat</span>), <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>; ⌜<span class="id" title="var">n</span> = <span class="id" title="var">sz</span>⌝ ∗ †<span class="id" title="var">l</span>…<span class="id" title="var">sz</span> ∗ <span class="id" title="var">l</span> ↦∗ <span class="id" title="tactic">repeat</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>) <span class="id" title="var">sz</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_free</span> <span class="id" title="var">E</span> (<span class="id" title="var">n</span>:<span class="id" title="var">Z</span>) <span class="id" title="var">l</span> <span class="id" title="var">vl</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">n</span> = <span class="id" title="var">length</span> <span class="id" title="var">vl</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦∗ <span class="id" title="var">vl</span> ∗ ▷ †<span class="id" title="var">l</span>…(<span class="id" title="var">length</span> <span class="id" title="var">vl</span>) }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">Free</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">n</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; <span class="id" title="var">True</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_sc_guarded_cells</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">v</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; <span class="id" title="var">l</span> ↦[^ <span class="id" title="var">c</span>] <span class="id" title="var">v</span>) ∗ <span class="id" title="var">G</span> ∗ £(<span class="id" title="var">d</span>) }}} <span class="id" title="var">Read</span> <span class="id" title="var">ScOrd</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span> {{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_sc</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> }}} <span class="id" title="var">Read</span> <span class="id" title="var">ScOrd</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_na_guarded_cells</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">G</span> <span class="id" title="var">v</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; (<span class="id" title="var">l</span> ↦[^ <span class="id" title="var">c</span>] <span class="id" title="var">v</span>)) ∗ <span class="id" title="var">G</span> ∗ £(3*<span class="id" title="var">d</span>) }}} <span class="id" title="var">Read</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_na_guarded_cells_0</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">G</span> <span class="id" title="var">v</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>}&amp;&amp;&gt; (<span class="id" title="var">l</span> ↦[^ <span class="id" title="var">c</span>] <span class="id" title="var">v</span>)) ∗ <span class="id" title="var">G</span> }}} <span class="id" title="var">Read</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_na</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">v</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> }}} <span class="id" title="var">Read</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_na_guarded_cells_singleton</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">G</span> <span class="id" title="var">v</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; (<span class="id" title="var">l</span> ↦[^ <span class="id" title="var">c</span>]∗ [<span class="id" title="var">v</span>])) ∗ <span class="id" title="var">G</span> ∗ £(3*<span class="id" title="var">d</span>) }}} <span class="id" title="var">Read</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_read_na_guarded</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">G</span> <span class="id" title="var">v</span> <span class="id" title="var">d</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; (<span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span>)) ∗ <span class="id" title="var">G</span> ∗ £(3*<span class="id" title="var">d</span>) }}} <span class="id" title="var">Read</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">v</span>; <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_write_sc_guarded</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">v'</span> ∗ £(3*<span class="id" title="var">d</span>+1) }}} <span class="id" title="var">Write</span> <span class="id" title="var">ScOrd</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) <span class="id" title="var">e</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">v</span> ∗ <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_write_sc</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">v'</span> ∗ £1 }}} <span class="id" title="var">Write</span> <span class="id" title="var">ScOrd</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) <span class="id" title="var">e</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_write_na_guarded</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">v'</span> ∗ £(3*<span class="id" title="var">d</span>) }}} <span class="id" title="var">Write</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) <span class="id" title="var">e</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">v</span> ∗ <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_write_na_guarded_0</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">cells</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">cells</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">cells</span>) #↦ <span class="id" title="var">v'</span> ∗ £(3*<span class="id" title="var">d</span>) }}} <span class="id" title="var">Write</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) <span class="id" title="var">e</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; (<span class="id" title="var">l</span>,<span class="id" title="var">cells</span>) #↦ <span class="id" title="var">v</span> ∗ <span class="id" title="var">G</span> }}}.<br/>
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_write_na_guarded_more_credits</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> <span class="id" title="var">d'</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ∪ ↑<span class="id" title="var">timeN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">time_ctx</span> -∗<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">v'</span> ∗ £(3*<span class="id" title="var">d</span>) ∗ ⧖(<span class="id" title="var">d'</span>) }}} <span class="id" title="var">Write</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) <span class="id" title="var">e</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">v</span> ∗ <span class="id" title="var">G</span> ∗ £(6*<span class="id" title="var">d'</span>) }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_write_na</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> <span class="id" title="var">v'</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e</span> <span class="id" title="var">v</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">v'</span> }}} <span class="id" title="var">Write</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) <span class="id" title="var">e</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cell_move_na</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">l'</span> <span class="id" title="var">cell</span> <span class="id" title="var">v'</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">l</span> ↦! (<span class="id" title="var">FCell</span> <span class="id" title="var">cell</span>) ∗ <span class="id" title="var">l'</span> ↦ <span class="id" title="var">v'</span> }}} <span class="id" title="var">Write</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l'</span>) (<span class="id" title="var">Read</span> <span class="id" title="var">Na1Ord</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>)) @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> <span class="id" title="var">LitPoison</span>; ∃ <span class="id" title="var">v</span>, <span class="id" title="var">l</span> ↦ <span class="id" title="var">v</span> ∗ <span class="id" title="var">l'</span> ↦! (<span class="id" title="var">FCell</span> <span class="id" title="var">cell</span>) }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_int_fail_guarded</span>  <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">z1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> <span class="id" title="var">zl</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) → <span class="id" title="var">z1</span> ≠ <span class="id" title="var">zl</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">zl</span>) ∗ £(3 × <span class="id" title="var">d</span> + 1) }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> $ <span class="id" title="var">LitInt</span> 0; <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">zl</span>) }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_int_fail</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">z1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> <span class="id" title="var">zl</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) → <span class="id" title="var">z1</span> ≠ <span class="id" title="var">zl</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">zl</span>) ∗ £1 }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> $ <span class="id" title="var">LitInt</span> 0; <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">zl</span>) }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_suc_guarded</span>  <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">lit1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) → <span class="id" title="var">lit1</span> ≠ <span class="id" title="var">LitPoison</span> →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit1</span> ∗ £(3 × <span class="id" title="var">d</span> + 1) }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> <span class="id" title="var">lit1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> $ <span class="id" title="var">LitInt</span> 1; <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_int_suc_guarded</span>  <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">c</span> <span class="id" title="var">z1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> <span class="id" title="var">d</span> <span class="id" title="var">G</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) →<br/>
+&nbsp;&nbsp;{{{ (<span class="id" title="var">G</span> &amp;&amp;{↑<span class="id" title="var">naN</span>; <span class="id" title="var">d</span>}&amp;&amp;&gt; ((<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦<span class="id" title="var">_</span>)) ∗ <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) ∗ £(3 × <span class="id" title="var">d</span> + 1) }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> $ <span class="id" title="var">LitInt</span> 1; <span class="id" title="var">G</span> ∗ (<span class="id" title="var">l</span>,<span class="id" title="var">c</span>) #↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_suc</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">lit1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) → <span class="id" title="var">lit1</span> ≠ <span class="id" title="var">LitPoison</span> →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit1</span> ∗ £1 }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> <span class="id" title="var">lit1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> 1); <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_int_suc</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">z1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) ∗ £1 }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitInt</span> <span class="id" title="var">z1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> 1); <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_cas_loc_suc</span> <span class="id" title="var">E</span> <span class="id" title="var">l</span> <span class="id" title="var">l1</span> <span class="id" title="var">e2</span> <span class="id" title="var">lit2</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;<span class="id" title="var">IntoVal</span> <span class="id" title="var">e2</span> (<span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span>) →<br/>
+&nbsp;&nbsp;{{{ ▷ <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> (<span class="id" title="var">LitLoc</span> <span class="id" title="var">l1</span>) ∗ £1 }}}<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">CAS</span> (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l</span>) (<span class="id" title="var">Lit</span> $ <span class="id" title="var">LitLoc</span> <span class="id" title="var">l1</span>) <span class="id" title="var">e2</span> @ <span class="id" title="var">E</span><br/>
+&nbsp;&nbsp;{{{ <span class="id" title="var">RET</span> <span class="id" title="var">LitV</span> (<span class="id" title="var">LitInt</span> 1); <span class="id" title="var">l</span> ↦ <span class="id" title="var">LitV</span> <span class="id" title="var">lit2</span> }}}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_eq_loc</span> <span class="id" title="var">E</span> (<span class="id" title="var">l1</span> : <span class="id" title="var">loc</span>) (<span class="id" title="var">l2</span>: <span class="id" title="var">loc</span>) <span class="id" title="var">v1</span> <span class="id" title="var">v2</span> <span class="id" title="var">P</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;↑<span class="id" title="var">naN</span> ⊆ <span class="id" title="var">E</span> →<br/>
+&nbsp;&nbsp;(<span class="id" title="var">P</span> -∗ ▷ <span class="id" title="var">l1</span> ↦ <span class="id" title="var">v1</span>) →<br/>
+&nbsp;&nbsp;(<span class="id" title="var">P</span> -∗ ▷ <span class="id" title="var">l2</span> ↦ <span class="id" title="var">v2</span>) →<br/>
+&nbsp;&nbsp;(<span class="id" title="var">P</span> -∗ ▷ <span class="id" title="var">Φ</span> (<span class="id" title="var">LitV</span> (<span class="id" title="var">bool_decide</span> (<span class="id" title="var">l1</span> = <span class="id" title="var">l2</span>)))) →<br/>
+&nbsp;&nbsp;<span class="id" title="var">P</span> -∗ <span class="id" title="var">WP</span> <span class="id" title="var">BinOp</span> <span class="id" title="var">EqOp</span> (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitLoc</span> <span class="id" title="var">l1</span>)) (<span class="id" title="var">Lit</span> (<span class="id" title="var">LitLoc</span> <span class="id" title="var">l2</span>)) @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
+Proof rules for working on the n-ary argument list. 
+</div>
+<div class="code">
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_app_ind</span> <span class="id" title="var">E</span> <span class="id" title="var">f</span> (<span class="id" title="var">el</span> : <span class="id" title="var">list</span> <span class="id" title="var">expr</span>) (<span class="id" title="var">Ql</span> : <span class="id" title="var">vec</span> (<span class="id" title="var">val</span> → <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>) (<span class="id" title="var">length</span> <span class="id" title="var">el</span>)) <span class="id" title="var">vs</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">AsVal</span> <span class="id" title="var">f</span> →<br/>
+&nbsp;&nbsp;([∗ <span class="id" title="var">list</span>] <span class="id" title="var">eQ</span> ∈ <span class="id" title="var">zip</span> <span class="id" title="var">el</span> <span class="id" title="var">Ql</span>, <span class="id" title="var">WP</span> <span class="id" title="var">eQ</span>.1 @ <span class="id" title="var">E</span> {{ <span class="id" title="var">eQ</span>.2 }}) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(∀ <span class="id" title="var">vl</span> : <span class="id" title="var">vec</span> <span class="id" title="var">val</span> (<span class="id" title="var">length</span> <span class="id" title="var">el</span>), ([∗ <span class="id" title="var">list</span>] <span class="id" title="var">vQ</span> ∈ <span class="id" title="var">zip</span> <span class="id" title="var">vl</span> <span class="id" title="var">Ql</span>, <span class="id" title="var">vQ</span>.2 $ <span class="id" title="var">vQ</span>.1) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">App</span> <span class="id" title="var">f</span> (<span class="id" title="var">of_val</span> &lt;$&gt; <span class="id" title="var">vs</span> ++ <span class="id" title="var">vl</span>) @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">App</span> <span class="id" title="var">f</span> ((<span class="id" title="var">of_val</span> &lt;$&gt; <span class="id" title="var">vs</span>) ++ <span class="id" title="var">el</span>) @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_app_vec</span> <span class="id" title="var">E</span> <span class="id" title="var">f</span> <span class="id" title="var">el</span> (<span class="id" title="var">Ql</span> : <span class="id" title="var">vec</span> (<span class="id" title="var">val</span> → <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>) (<span class="id" title="var">length</span> <span class="id" title="var">el</span>)) <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">AsVal</span> <span class="id" title="var">f</span> →<br/>
+&nbsp;&nbsp;([∗ <span class="id" title="var">list</span>] <span class="id" title="var">eQ</span> ∈ <span class="id" title="var">zip</span> <span class="id" title="var">el</span> <span class="id" title="var">Ql</span>, <span class="id" title="var">WP</span> <span class="id" title="var">eQ</span>.1 @ <span class="id" title="var">E</span> {{ <span class="id" title="var">eQ</span>.2 }}) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(∀ <span class="id" title="var">vl</span> : <span class="id" title="var">vec</span> <span class="id" title="var">val</span> (<span class="id" title="var">length</span> <span class="id" title="var">el</span>), ([∗ <span class="id" title="var">list</span>] <span class="id" title="var">vQ</span> ∈ <span class="id" title="var">zip</span> <span class="id" title="var">vl</span> <span class="id" title="var">Ql</span>, <span class="id" title="var">vQ</span>.2 $ <span class="id" title="var">vQ</span>.1) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">App</span> <span class="id" title="var">f</span> (<span class="id" title="var">of_val</span> &lt;$&gt; (<span class="id" title="var">vl</span> : <span class="id" title="var">list</span> <span class="id" title="var">val</span>)) @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">App</span> <span class="id" title="var">f</span> <span class="id" title="var">el</span> @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+ 
+<br/>
+<span class="id" title="keyword">Lemma</span> <span class="id" title="var">wp_app</span> (<span class="id" title="var">Ql</span> : <span class="id" title="var">list</span> (<span class="id" title="var">val</span> → <span class="id" title="var">iProp</span> <span class="id" title="var">Σ</span>)) <span class="id" title="var">E</span> <span class="id" title="var">f</span> <span class="id" title="var">el</span> <span class="id" title="var">Φ</span> :<br/>
+&nbsp;&nbsp;<span class="id" title="var">length</span> <span class="id" title="var">Ql</span> = <span class="id" title="var">length</span> <span class="id" title="var">el</span> → <span class="id" title="var">AsVal</span> <span class="id" title="var">f</span> →<br/>
+&nbsp;&nbsp;([∗ <span class="id" title="var">list</span>] <span class="id" title="var">eQ</span> ∈ <span class="id" title="var">zip</span> <span class="id" title="var">el</span> <span class="id" title="var">Ql</span>, <span class="id" title="var">WP</span> <span class="id" title="var">eQ</span>.1 @ <span class="id" title="var">E</span> {{ <span class="id" title="var">eQ</span>.2 }}) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;(∀ <span class="id" title="var">vl</span> : <span class="id" title="var">list</span> <span class="id" title="var">val</span>, ⌜<span class="id" title="var">length</span> <span class="id" title="var">vl</span> = <span class="id" title="var">length</span> <span class="id" title="var">el</span>⌝ -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;([∗ <span class="id" title="var">list</span>] <span class="id" title="var">k</span> ↦ <span class="id" title="var">vQ</span> ∈ <span class="id" title="var">zip</span> <span class="id" title="var">vl</span> <span class="id" title="var">Ql</span>, <span class="id" title="var">vQ</span>.2 $ <span class="id" title="var">vQ</span>.1) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">App</span> <span class="id" title="var">f</span> (<span class="id" title="var">of_val</span> &lt;$&gt; (<span class="id" title="var">vl</span> : <span class="id" title="var">list</span> <span class="id" title="var">val</span>)) @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}) -∗<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">WP</span> <span class="id" title="var">App</span> <span class="id" title="var">f</span> <span class="id" title="var">el</span> @ <span class="id" title="var">E</span> {{ <span class="id" title="var">Φ</span> }}.<br/>
+
+<br/>
+
+<br/>
+<span class="id" title="keyword">End</span> <span class="id" title="var">lifting</span>.<br/>
+</div>
+</div>
+
+<div id="footer">
+<hr/><a href="index.html">Index</a><hr/>This page has been generated by <a href="http://coq.inria.fr/">coqdoc</a>
+</div>
+
+</div>
+
+</body>
+</html>

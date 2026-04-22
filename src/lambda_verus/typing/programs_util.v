@@ -1,4 +1,4 @@
-From iris.proofmode Require Import environments.
+From iris.proofmode Require Import environments proofmode.
 From lrust.lang Require Import proofmode memcpy.
 From lrust.typing Require Export type lft_contexts type_context cont_context programs.
 From lrust.lifetime Require Import lifetime_full.

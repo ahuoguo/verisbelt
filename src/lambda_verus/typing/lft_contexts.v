@@ -1,4 +1,4 @@
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import proofmode.
 From lrust.util Require Import basic.
 From lrust.lang Require Import proofmode.
 From lrust.typing Require Export base.

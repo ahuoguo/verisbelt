@@ -1,4 +1,4 @@
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import proofmode.
 From lrust.util Require Import basic.
 From iris.algebra Require Import gset coPset dfrac_agree auth gmultiset view list gmap excl numbers.
 From iris.base_logic.lib Require Import own.

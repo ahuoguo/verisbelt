@@ -8,7 +8,7 @@ Require Import stdpp.base.
 From iris.algebra Require Export cmra updates.
 From iris.algebra Require Import proofmode_classes excl gmap_view.
 From iris.base_logic.lib Require Export own iprop invariants.
-From iris.proofmode Require Import base ltac_tactics tactics coq_tactics.
+From iris.proofmode Require Import base proofmode.
 
 Local Open Scope nat_scope.
 

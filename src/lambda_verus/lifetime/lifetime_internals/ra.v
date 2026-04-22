@@ -8,10 +8,10 @@ From iris.algebra Require Import dfrac_agree.
 From iris.prelude Require Import options.
 
 From iris.base_logic.lib Require Export own iprop.
-From iris.proofmode Require Import base.
-From iris.proofmode Require Import ltac_tactics.
-From iris.proofmode Require Import tactics.
-From iris.proofmode Require Import coq_tactics.
+From iris.proofmode Require Import base proofmode.
+From iris.proofmode Require Import proofmode.
+From iris.proofmode Require Import proofmode.
+From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 (* Leaf Lifetime Logic. Based loosely on RustBelt's lifetime logic. *)

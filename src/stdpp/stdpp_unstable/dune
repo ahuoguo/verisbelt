@@ -1,5 +1,0 @@
-(include_subdirs qualified)
-(coq.theory
- (name stdpp.unstable)
- (package coq-stdpp-unstable)
- (theories stdpp stdpp.bitvector))

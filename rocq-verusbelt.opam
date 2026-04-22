@@ -1,0 +1,21 @@
+opam-version: "2.0"
+synopsis: "VerusBelt: A Semantic Foundation for Verus's Proof-Oriented Extensions to the Rust Type System"
+maintainer: ["ahuoguo@gmail.com"]
+authors: ["VerusBelt authors"]
+license: "BSD-3-Clause"
+tags: ["separation logic" "rust" "verus"]
+homepage: "https://github.com/ahuoguo/verisbelt"
+bug-reports: "https://github.com/ahuoguo/verisbelt/issues"
+dev-repo: "git+https://github.com/ahuoguo/verisbelt.git"
+depends: [
+  "rocq-core" {>= "9.1.1" & < "9.2~"}
+  "rocq-stdlib" {>= "9.0.0" & < "9.2~"}
+  "rocq-iris" {= "4.5.0"}
+  "rocq-stdpp" {= "1.13.0"}
+]
+build: [
+  [make "-j%{jobs}%"]
+]
+install: [
+  [make "install"]
+]

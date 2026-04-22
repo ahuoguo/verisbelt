@@ -36,7 +36,7 @@ jobs:
               opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only
             endGroup
           before_script: |
-            sudo chown -R coq:coq . # workaround a permission issue
+            sudo chown -R 1000:1000 .  
           script: |
             startGroup Build
               make -j2

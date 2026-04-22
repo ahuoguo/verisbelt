@@ -15,9 +15,13 @@ clean: Makefile.coq
 	rm -f Makefile.coq Makefile.coq.conf .lia.cache .nia.cache
 .PHONY: clean
 
-# Create Coq Makefile.
+# Create Coq Makefile (prefer `rocq makefile` when present; fall back to coq_makefile).
 Makefile.coq: _CoqProject Makefile
-	"$(COQBIN)coq_makefile" -f _CoqProject -o Makefile.coq
+	@if command -v "$(COQBIN)rocq" >/dev/null 2>&1; then \
+	  "$(COQBIN)rocq" makefile -f _CoqProject -o Makefile.coq; \
+	else \
+	  "$(COQBIN)coq_makefile" -f _CoqProject -o Makefile.coq; \
+	fi
 
 # Some files that do *not* need to be forwarded to Makefile.coq
 Makefile: ;

@@ -26,25 +26,18 @@ jobs:
           opam_file: 'rocq-verusbelt.opam'
           custom_image: ${{ matrix.image }}
           install: |
-            startGroup "Install dependencies"
-              sudo apt-get update -y -q
-              opam repo remove coq-released || true
+            startGroup "Configure opam repositories"
               opam repo add --this-switch rocq-released https://rocq-prover.org/opam/released || true
               opam repo add --this-switch iris-dev https://gitlab.mpi-sws.org/iris/opam.git || true
-              opam pin add -n -y -k path $PACKAGE $WORKDIR
               opam update -y
-              opam reinstall --forget-pending --yes
+            endGroup
+            startGroup "Install VerusBelt dependencies"
+              opam pin add -n -y -k path $PACKAGE $WORKDIR
               opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only
             endGroup
-          before_script: |
-            sudo chown -R coq:coq . # workaround a permission issue
           script: |
             startGroup Build
               make -j2
             endGroup
           uninstall: |
             make clean
-      - name: Revert permissions
-        # to avoid a warning at cleanup time
-        if: ${{ always() }}
-        run: sudo chown -R 1001:116 .

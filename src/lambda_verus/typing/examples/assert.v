@@ -56,7 +56,7 @@ Section assert.
         * iApply (type_new_subtype () 0 with "[]"); first by lia.
           { apply uninit_unit_1. }
           iIntros. simpl_subst. iApply type_jump.
-           -- rewrite elem_of_list_singleton. reflexivity.
+           -- rewrite list_elem_of_singleton. reflexivity.
            -- apply tctx_extract_elt_here_exact.
            -- apply resolve_tctx_just.
            -- reflexivity.

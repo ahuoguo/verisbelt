@@ -6,7 +6,7 @@ Require Import stdpp.base.
 From iris.algebra Require Export cmra updates.
 From iris.algebra Require Import proofmode_classes excl gmap_view.
 From iris.base_logic.lib Require Export own iprop invariants.
-From iris.proofmode Require Import base ltac_tactics tactics coq_tactics.
+From iris.proofmode Require Import base proofmode.
 
 (** Non-atomic map. **)
 
@@ -68,7 +68,7 @@ Section NonAtomicInternals.
     intros pa a_in_l lzero.
     rewrite length_zero_iff_nil in lzero.
     assert (a ∈ filter P l) as H.
-    { rewrite elem_of_list_filter. split; trivial. }
+    { rewrite list_elem_of_filter. split; trivial. }
     rewrite lzero in H. rewrite elem_of_nil in H. trivial.
   Qed.
   
@@ -88,7 +88,7 @@ Section NonAtomicInternals.
   Proof.
     unfold counts_agree. intros is_in hc l1. have hcl := hc l1.
     unfold heap_count. unfold heap_count in hcl. destruct (decide (l = l1)) as [h|h].
-    - subst l1. rewrite lookup_insert. rewrite is_in in hcl. trivial.
+    - subst l1. rewrite lookup_insert_eq. rewrite is_in in hcl. trivial.
     - rewrite lookup_insert_ne; trivial.
   Qed.
     
@@ -99,7 +99,7 @@ Section NonAtomicInternals.
   Proof.
     unfold counts_agree. intros is_in hc l1. have hcl := hc l1.
     unfold heap_count. unfold heap_count in hcl. destruct (decide (l = l1)) as [h|h].
-    - subst l1. rewrite lookup_insert. rewrite is_in in hcl. trivial.
+    - subst l1. rewrite lookup_insert_eq. rewrite is_in in hcl. trivial.
     - rewrite lookup_insert_ne; trivial.
   Qed.
   
@@ -110,7 +110,7 @@ Section NonAtomicInternals.
     { exists (fresh ((λ a , a.1.2) <$> map_to_list m)). apply infinite_is_fresh. }
     exists x. destruct (m !! (l, x)) as [u|] eqn:mlx; trivial.
     exfalso. apply H. rewrite <- elem_of_map_to_list in mlx.
-    rewrite elem_of_list_fmap. exists ((l, x), u). intuition.
+    rewrite list_elem_of_fmap. exists ((l, x), u). intuition.
   Qed.
        
   Local Lemma erase_count_map_same_update_read_count (σ: gmap L (V * ReadWriteState)) l v n m :
@@ -119,7 +119,7 @@ Section NonAtomicInternals.
   Proof.
     intro is_in. unfold erase_count_map. rewrite fmap_insert. simpl.
     apply map_eq. intros l1. destruct (decide (l = l1)) as [h|h].
-    - subst l1. rewrite lookup_insert. rewrite lookup_fmap. rewrite is_in. trivial.
+    - subst l1. rewrite lookup_insert_eq. rewrite lookup_fmap. rewrite is_in. trivial.
     - rewrite lookup_insert_ne; trivial.
   Qed.
   
@@ -146,12 +146,12 @@ Section NonAtomicInternals.
     (ne : l ≠ l1)
     : m_count m l1 = m_count (<[(l, i):=G]> m) l1.
   Proof.
-    assert (delete (l, i) m !! (l, i) = None) as H by apply lookup_delete.
+    assert (delete (l, i) m !! (l, i) = None) as H by apply lookup_delete_eq.
     destruct (m !! (l, i)) as [G2|] eqn:m_in.
      - have t1 := m_count_insert_ne_helper (delete (l, i) m) l l1 i G ne H.
        have t2 := m_count_insert_ne_helper (delete (l, i) m) l l1 i G2 ne H.
-       rewrite insert_delete in t2; trivial.
-       rewrite insert_delete_insert in t1.
+       rewrite insert_delete_id in t2; trivial.
+       rewrite insert_delete_eq in t1.
        rewrite t2 in t1. trivial.
      - apply m_count_insert_ne_helper; trivial.
   Qed.
@@ -160,9 +160,9 @@ Section NonAtomicInternals.
     (is_in : m !! (l, i) = Some G)
     : m_count m l - 1 = m_count (delete (l, i) m) l.
   Proof.
-    assert (delete (l, i) m !! (l, i) = None) as H by apply lookup_delete.
+    assert (delete (l, i) m !! (l, i) = None) as H by apply lookup_delete_eq.
     have j := m_count_insert_plus1 (delete (l, i) m) l i G H.
-    rewrite insert_delete in j; trivial. lia.
+    rewrite insert_delete_id in j; trivial. lia.
   Qed.
     
   Local Lemma m_count_delete_ne m l l1 i
@@ -171,8 +171,8 @@ Section NonAtomicInternals.
   Proof.
     destruct (m !! (l, i)) as [G|] eqn:de.
      - have j := m_count_insert_ne (delete (l, i) m) l l1 i G ne.
-       rewrite j. rewrite insert_delete; trivial.
-     - rewrite delete_notin; trivial.
+       rewrite j. rewrite insert_delete_id; trivial.
+     - rewrite delete_id; trivial.
   Qed.
       
   Local Lemma counts_agree_insert_read
@@ -185,7 +185,7 @@ Section NonAtomicInternals.
   Proof.
     intros l1. have cal := ca l1. unfold heap_count in *.
     destruct (decide (l = l1)) as [h|h].
-     - subst l1. rewrite lookup_insert. rewrite is_read in cal. rewrite cal.
+     - subst l1. rewrite lookup_insert_eq. rewrite is_read in cal. rewrite cal.
        apply m_count_insert_plus1; trivial.
      - rewrite lookup_insert_ne; trivial. rewrite <- m_count_insert_ne; trivial.
   Qed.
@@ -201,7 +201,7 @@ Section NonAtomicInternals.
   Proof.
     intros l1. have cal := ca l1. unfold heap_count in *.
     destruct (decide (l = l1)) as [h|h].
-     - subst l1. rewrite lookup_insert. rewrite is_read in cal. rewrite cal.
+     - subst l1. rewrite lookup_insert_eq. rewrite is_read in cal. rewrite cal.
        apply m_count_delete_minus1 with (G := G); trivial.
      - rewrite lookup_insert_ne; trivial. rewrite <- m_count_delete_ne; trivial.
   Qed.
@@ -215,7 +215,7 @@ Section NonAtomicInternals.
   Proof.
     intros is_none ca l1. have cal := ca l1. unfold heap_count in *.
     destruct (decide (l = l1)) as [h|h].
-    - subst l1. rewrite lookup_insert. rewrite is_none in cal. trivial.
+    - subst l1. rewrite lookup_insert_eq. rewrite is_none in cal. trivial.
     - rewrite lookup_insert_ne; trivial.
   Qed.
   
@@ -228,7 +228,7 @@ Section NonAtomicInternals.
   Proof.
     intros is_none ca l1. have cal := ca l1. unfold heap_count in *.
     destruct (decide (l = l1)) as [h|h].
-    - subst l1. rewrite lookup_delete. rewrite is_none in cal. trivial.
+    - subst l1. rewrite lookup_delete_eq. rewrite is_none in cal. trivial.
     - rewrite lookup_delete_ne; trivial.
   Qed.
   
@@ -465,9 +465,9 @@ Section NonAtomicMap.
       ⋅ gmap_view_frag (V := agreeR (leibnizO (V * ReadWriteState')))
         l (DfracOwn 1) (to_agree (v, Writing'))
     )) with "heap") as "[oh pt]".
-    { 
+    {
       unfold erase_count_map. rewrite fmap_insert. rewrite fmap_insert.
-      apply gmap_view_replace. done.
+      apply (gmap_view_replace (V := agreeR (leibnizO (V * ReadWriteState'))) _ _ _ (to_agree (v, Writing'))). done.
     }
     iModIntro. iFrame.
     iPureIntro. split; trivial.
@@ -494,7 +494,7 @@ Section NonAtomicMap.
     )) with "heap") as "[oh pt]".
     { 
       unfold erase_count_map. rewrite fmap_insert. rewrite fmap_insert.
-      apply gmap_view_replace. done.
+      apply (gmap_view_replace (V := agreeR (leibnizO (V * ReadWriteState'))) _ _ _ (to_agree (v', Reading'))). done.
     }
     iModIntro. iFrame.
     iPureIntro. split; trivial.
@@ -618,7 +618,7 @@ Section NonAtomicMap.
     iMod (na_write_begin with "a") as "[%sig [pt heap]]".
     iMod (na_write_finish with "[pt heap]") as "[%sig2 [pt heap]]".
         { iFrame "pt". iFrame "heap". }
-    iModIntro. iFrame "pt". rewrite insert_insert. iFrame "heap".
+    iModIntro. iFrame "pt". rewrite insert_insert_eq. iFrame "heap".
     iPureIntro. apply sig.
   Qed.
     
@@ -646,9 +646,9 @@ Section NonAtomicMap.
       ⋅ gmap_view_frag (V := agreeR (leibnizO (V * ReadWriteState')))
         l (DfracOwn 1) (to_agree (v, Reading'))
     )) with "oh") as "[oh pt]".
-    { 
+    {
       unfold erase_count_map. rewrite fmap_insert. rewrite fmap_insert.
-      apply gmap_view_alloc.
+      apply (gmap_view_alloc (V := agreeR (leibnizO (V * ReadWriteState'))) _ l (DfracOwn 1) (to_agree (v, Reading'))).
        - rewrite lookup_fmap. rewrite lookup_fmap. rewrite not_in. trivial.
        - done.
        - done.

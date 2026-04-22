@@ -351,7 +351,7 @@ Proof.
   split; [done|]. case=> [𝔅i j]?. rewrite /S' /add_line /discrete_fun_insert -Sim /=.
   case (decide (𝔄i = 𝔅i))=>//= ?. subst=>/=.
   case (decide (i = j))=> [<-|?]; [|by rewrite lookup_insert_ne].
-  rewrite lookup_insert EqNone. split=> Eqv; [apply (inj Some) in Eqv|]; inversion Eqv.
+  rewrite lookup_insert_eq EqNone. split=> Eqv; [apply (inj Some) in Eqv|]; inversion Eqv.
 Qed.
 
 (** Prophecy Resolution *)
@@ -361,7 +361,7 @@ Local Lemma proph_tok_out S L ξ q :
 Proof.
   move=> Sim. iIntros "●S ξ".
   iDestruct (own_valid_2 with "●S ξ") as %ValBoth. iPureIntro.
-  move=> /(elem_of_list_fmap_2 pli_pv) [[[𝔄i i]?][? /Sim Eqv]]. simpl in *.
+  move=> /(list_elem_of_fmap_1 pli_pv) [[[𝔄i i]?][? /Sim Eqv]]. simpl in *.
   subst. move: ValBoth=> /auth_both_valid_discrete [Inc _].
   move/(discrete_fun_included_spec_1 _ _ 𝔄i) in Inc.
   rewrite /line discrete_fun_lookup_singleton /= in Inc.
@@ -402,10 +402,10 @@ Proof.
   iModIntro. iExists S'. iFrame "●S'". iPureIntro. exists L'. split.
   { split; [done| split; [|done]] => ?? Eqv. apply Dep => ? /Outζl ?. by apply Eqv. }
   have InLNe ζ wπ : .{ζ := wπ} ∈ L → ξ ≠ ζ.
-  { move=> /(elem_of_list_fmap_1 pli_pv) ??. by subst. }
+  { move=> /(list_elem_of_fmap_2 pli_pv) ??. by subst. }
   move=> [𝔅i j] ?. rewrite elem_of_cons. case (decide (ξ = PrVar 𝔅i j))=> [Eq|Ne].
   { dependent destruction Eq.
-    rewrite /S' /add_line discrete_fun_lookup_insert lookup_insert. split.
+    rewrite /S' /add_line discrete_fun_lookup_insert lookup_insert_eq. split.
     - move=> /(inj (Some ∘ aitem)) ->. by left.
     - move=> [Eq'|/InLNe ?]; [|done]. by dependent destruction Eq'. }
   have Eqv : S' 𝔅i !! j ≡ S 𝔅i !! j.
@@ -551,15 +551,15 @@ Proof.
          + intros xid. destruct (decide (xid = pv_id ξ)) as [->|Hno2].
            * do 2 (rewrite discrete_fun_lookup_op). rewrite lookup_op.
              rewrite lookup_op. rewrite discrete_fun_lookup_insert.
-             rewrite lookup_delete.
+             rewrite lookup_delete_eq.
              rewrite (Hincl1 (pv_ty ξ)).
              rewrite lookup_op. unfold line. rewrite discrete_fun_lookup_singleton.
-             rewrite lookup_singleton.
+             rewrite lookup_singleton_eq.
              assert (✓(Some (fitem 1) ⋅ b1 (pv_ty ξ) !! pv_id ξ)). {
                 setoid_rewrite Hincl1 in Hvalz.
                 have H1 := Hvalz (pv_ty ξ) (pv_id ξ). rewrite lookup_op in H1.
                 unfold line in H1. rewrite discrete_fun_lookup_singleton in H1.
-                rewrite lookup_singleton in H1. apply H1.
+                rewrite lookup_singleton_eq in H1. apply H1.
              }
              rewrite val_lemma; trivial.
              apply eq_none_lemma. generalize Hnotin.

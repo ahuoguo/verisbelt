@@ -5,7 +5,6 @@
 *.vok
 .coqdeps.d
 .Makefile.coq.d
-.Makefile.using_opam.coq.d
 *.glob
 *.cache
 *.aux

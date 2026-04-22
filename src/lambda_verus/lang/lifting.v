@@ -555,7 +555,9 @@ Proof.
   iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
   (* iMod lc_zero as "£0". *)
   iApply (wp_write_sc_guarded E l [] e v v' 0 (True)%I with "[pt £]"); trivial.
-   - iFrame. rewrite heap_cloc1_mapsto_val. iFrame. iApply guards_true.
+   - iFrame. replace ((l, []) #↦_)%I with (True : iProp Σ)%I.
+     2: { unfold heap_complete_mapsto. simpl. trivial. }
+     iApply guards_true.
    - iNext. iIntros "[A B]". iApply "ToΦ". rewrite heap_cloc1_mapsto_val. iFrame.
 Qed. 
 
@@ -644,7 +646,9 @@ Proof.
   iIntros (Hmask IntoVal Φ) ">pt ToΦ".
   iMod lc_zero as "£0".
   iApply (wp_write_na_guarded E l [] e v v' 0 (True)%I with "[pt £0]"); trivial.
-   - iFrame. rewrite heap_cloc1_mapsto_val. iFrame. iApply guards_true.
+   - iFrame. replace ((l, []) #↦_)%I with (True : iProp Σ)%I.
+     2: { unfold heap_complete_mapsto. simpl. trivial. }
+     iApply guards_true.
    - iNext. iIntros "[A B]". iApply "ToΦ". rewrite heap_cloc1_mapsto_val. iFrame.
 Qed.
 

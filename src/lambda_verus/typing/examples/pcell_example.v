@@ -190,7 +190,7 @@ Section assert.
     iIntros (v_unit_ret). simpl_subst.
     
     iApply type_jump.
-      { rewrite elem_of_list_singleton. reflexivity. }
+      { rewrite list_elem_of_singleton. reflexivity. }
       { solve_typing. }
       { solve_typing. }
       { reflexivity. }

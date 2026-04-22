@@ -130,16 +130,16 @@ Section StorageProtocol.
   Qed.
   
   Context {𝔄 𝔅 : syn_type}.
-  Context `{G𝔄: !inG Σ (@Ucmra' (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)}.
-  Context `{G𝔅: !inG Σ (@Ucmra' (~~𝔅) 𝔅_equiv 𝔅_dist 𝔅_pcore 𝔅_op 𝔅_valid 𝔅_validn 𝔅_unit 𝔅_mixin1 𝔅_mixin2 𝔅_mixin3)}.
-  Context `{Gℭ: !inG Σ (@Ucmra' (~~ℭ) ℭ_equiv ℭ_dist ℭ_pcore ℭ_op ℭ_valid ℭ_validn ℭ_unit ℭ_mixin1 ℭ_mixin2 ℭ_mixin3)}.
+  Context `{G𝔄: !inG Σ (@Ucmra' _ (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)}.
+  Context `{G𝔅: !inG Σ (@Ucmra' _ (~~𝔅) 𝔅_equiv 𝔅_dist 𝔅_pcore 𝔅_op 𝔅_valid 𝔅_validn 𝔅_unit 𝔅_mixin1 𝔅_mixin2 𝔅_mixin3)}.
+  Context `{Gℭ: !inG Σ (@Ucmra' _ (~~ℭ) ℭ_equiv ℭ_dist ℭ_pcore ℭ_op ℭ_valid ℭ_validn ℭ_unit ℭ_mixin1 ℭ_mixin2 ℭ_mixin3)}.
   Context { R : SPRel (~~𝔄) (~~𝔅) }.
   Context `{equ_p: @Equivalence (~~𝔄) (≡)}.
   Context `{equ_b: @Equivalence (~~𝔅) (≡)}.
   Context `{equ_c: @Equivalence (~~ℭ) (≡)}.
   Context { storage_mixin: StorageMixin (~~𝔄) (~~𝔅) }.
   Context `{sp_i: !sp_logicG storage_mixin Σ}.
-  Let ℭcmra := (@Ucmra' (~~ℭ) ℭ_equiv ℭ_dist ℭ_pcore ℭ_op ℭ_valid ℭ_validn ℭ_unit ℭ_mixin1 ℭ_mixin2 ℭ_mixin3).
+  Let ℭcmra := (@Ucmra' _ (~~ℭ) ℭ_equiv ℭ_dist ℭ_pcore ℭ_op ℭ_valid ℭ_validn ℭ_unit ℭ_mixin1 ℭ_mixin2 ℭ_mixin3).
   Context `{ CountableK: @Countable K EqK }.
   Hypothesis (𝔄_const  : ∀ (x : ~~𝔄) π1 π2 , @vπ 𝔄 x π1 = @vπ 𝔄 x π2).
   Variable (tyC : ghost_type ℭ) (F : ~~𝔅 → gmap K (~~ℭ)).
@@ -318,10 +318,9 @@ Section StorageProtocol.
     - iExists _; iSplitR => //=.
       rewrite sp_own_op.
       iDestruct "Hown" as "(?&?&%&#?&Hown1&Hown2)".
-      iFrame.
       rewrite /ty_own/=!heap_mapsto_vec_nil !freeable_util.freeable_sz_full.
       repeat rewrite heap_mapsto_fancy_vec_nil.
-      by iFrame "#".
+      iFrame. by iFrame "#".
     - iApply (proph_obs_impl with "Obs").
       intros π' [_ Hpost].
       apply Hpost.
@@ -539,7 +538,7 @@ Section StorageProtocol.
       rewrite Hnew_b' in Hnew_b.
       rewrite map_eq_iff in Hnew_b.
       move: (Hnew_b k).
-      rewrite lookup_singleton.
+      rewrite lookup_singleton_eq.
       move => Hlookup.
       by apply lookup_singleton_Some in Hlookup as [-> ->].
   Qed.
@@ -698,7 +697,7 @@ Section StorageProtocol.
       iPoseProof (guards_and_point _ _ _ (sp_own γ1 y) with "Hshr1'' Hshr2'") as "Hshr3".
       { apply point_prop_p_own. }
       { by iApply sp_own_and_specific. }
-      iPoseProof (guards_include_pers (⌜ {[γ1]} ⊆ ↑NllftG ⌝ ∗ (sp_sto _ _)) with "[] Hshr3") as "Hshr4".
+      iPoseProof (guards_include_pers (⌜ ({[γ1]} : coPset) ⊆ ↑NllftG ⌝ ∗ (sp_sto _ _)) with "[] Hshr3") as "Hshr4".
       { iSplit => //. }
 
       iIntros "!>".
@@ -745,7 +744,7 @@ Section StorageProtocol.
       iPoseProof (guards_and_point _ _ _ (sp_own γ1 y) with "Hshr1' Hshr2''") as "Hshr3".
       { apply point_prop_p_own. }
       { by iApply sp_own_and_specific. }
-      iPoseProof (guards_include_pers (⌜ {[γ1]} ⊆ ↑NllftG ⌝ ∗ (sp_sto _ _)) with "[] Hshr3") as "Hshr4".
+      iPoseProof (guards_include_pers (⌜ ({[γ1]} : coPset) ⊆ ↑NllftG ⌝ ∗ (sp_sto _ _)) with "[] Hshr3") as "Hshr4".
       { iSplit => //. }
 
       iIntros "!>".
@@ -823,7 +822,7 @@ Section StorageProtocol.
       rewrite -!bi.later_laterN.
       iSplitL => //.
       iClear "Hshr".
-      iPoseProof (guards_include_pers (⌜{[γ]} ⊆ ↑NllftG⌝ ∗ sp_sto γ (λ s : ~~ 𝔅, [∗ map] c ∈ F s, gt_gho tyC c tid))%I with "[] Hsp_own2") as "Hshr".
+      iPoseProof (guards_include_pers (⌜({[γ]} : coPset) ⊆ ↑NllftG⌝ ∗ sp_sto γ (λ s : ~~ 𝔅, [∗ map] c ∈ F s, gt_gho tyC c tid))%I with "[] Hsp_own2") as "Hshr".
       { by iSplit. }
       rewrite (bi.sep_comm (sp_own _ _) (⌜ _ ⌝ ∗ _))%I.
       rewrite bi.sep_assoc.
@@ -1182,7 +1181,7 @@ Section StorageProtocol.
       rewrite Hnew_b' in Hnew_b.
       rewrite map_eq_iff in Hnew_b.
       move: (Hnew_b k).
-      rewrite lookup_singleton.
+      rewrite lookup_singleton_eq.
       move => Hlookup.
       by apply lookup_singleton_Some in Hlookup as [-> ->].
   Qed.

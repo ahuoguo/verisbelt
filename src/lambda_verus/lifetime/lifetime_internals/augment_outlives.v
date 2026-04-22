@@ -11,8 +11,6 @@ From iris.prelude Require Import options.
 From iris.base_logic.lib Require Export own iprop.
 From iris.proofmode Require Import base proofmode.
 From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 Section FullBorrows.

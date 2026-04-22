@@ -6,6 +6,16 @@ Import uPred.
 From stdpp Require Export coPset.
 From iris.algebra Require Import functions.
 
+(* In iris 4.5 these instance projections of wsatGpreS were demoted to [Local
+   Existing Instances] inside the wsat module, so they must be re-exported here
+   for the [own_unit ... disabled_name] / [own_unit ... enabled_name] uses
+   below to typecheck. *)
+Existing Instances
+  wsatGS.wsat_inG
+  wsatGS.wsatGpreS_inv
+  wsatGS.wsatGpreS_enabled
+  wsatGS.wsatGpreS_disabled.
+
 Section wsat_util.
 
 Context `{!wsatGS.wsatGS Σ}.
@@ -73,7 +83,7 @@ Proof.
          rewrite ucmra_unit_left_id.
          
          rewrite discrete_fun_lookup_singleton.
-         rewrite lookup_singleton.
+         rewrite lookup_singleton_eq.
          
          unfold validN, cmra_validN, optionR, option_validN_instance.
          rewrite own.inG_unfold_validN.
@@ -84,7 +94,7 @@ Proof.
           subst γ2. subst x. rewrite mznone.
          rewrite ucmra_unit_left_id.
           rewrite discrete_fun_lookup_singleton.
-          rewrite lookup_singleton.
+          rewrite lookup_singleton_eq.
 
           unfold validN, cmra_validN, optionR, option_validN_instance.
           rewrite own.inG_unfold_validN.
@@ -132,7 +142,7 @@ Proof.
          
          subst x. rewrite h3.
          rewrite discrete_fun_lookup_singleton.
-         subst γ2. rewrite lookup_singleton.
+         subst γ2. rewrite lookup_singleton_eq.
          
          unfold validN, cmra_validN, optionR, option_validN_instance.
          rewrite own.inG_unfold_validN.
@@ -141,7 +151,7 @@ Proof.
           rewrite lookup_empty. rewrite ucmra_unit_left_id.
           rewrite <- h1.
           rewrite discrete_fun_lookup_singleton.
-          subst γ2. rewrite lookup_singleton.
+          subst γ2. rewrite lookup_singleton_eq.
           
           unfold validN, cmra_validN, optionR, option_validN_instance.
           rewrite own.inG_unfold_validN.

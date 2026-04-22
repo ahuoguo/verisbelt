@@ -11,8 +11,6 @@ From iris.prelude Require Import options.
 From iris.base_logic.lib Require Export own iprop.
 From iris.proofmode Require Import base proofmode.
 From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 Section FullBorrows.
@@ -51,7 +49,7 @@ Section FullBorrows.
     iIntros "inval".
     iDestruct ("Hvs" $! k Hin_my_alive with "Dead") as "[_ Hvs]".
     
-    iDestruct (full_borrows_invalidated_via_insert_false my_alive my_dead k sn mbs mprops (Borrow ∅ {[default_dead]}) P with "inval") as "inval"; trivial.
+    iDestruct (full_borrows_invalidated_via_insert_false my_alive my_dead k sn mbs mprops (Borrow ∅ dd) P with "inval") as "inval"; trivial.
     
     iMod ("Hvs" with "[inval]") as "[reval vs]". { iFrame. }
     
@@ -138,7 +136,7 @@ Section FullBorrows.
       { rewrite lookup_insert_ne; trivial. rewrite lookup_delete_ne; trivial. }
       { unfold invalidated. rewrite bool_decide_eq_true. set_solver. }
       iDestruct (full_borrows_invalidated_via_insert_false with "inval") as "inval".
-      { apply lookup_delete. }
+      { apply lookup_delete_eq. }
       iDestruct (full_borrows_invalidated_via_delete with "[P inval]") as "inval".
         { apply Hmbssn. } { iFrame "Heq". iFrame "inval". iFrame "P". }
       iFrame. iIntros "%t". exfalso. set_solver.
@@ -146,7 +144,7 @@ Section FullBorrows.
       iDestruct (full_borrows_invalidated_via_insert_false with "inval") as "inval".
       { rewrite lookup_insert_ne; trivial. rewrite lookup_delete_ne; trivial. }
       iDestruct (full_borrows_invalidated_via_insert with "inval") as "[P inval]".
-      { apply lookup_delete. }
+      { apply lookup_delete_eq. }
       { unfold invalidated. rewrite bool_decide_eq_true. set_solver. }
       iDestruct (full_borrows_invalidated_via_delete with "[P inval]") as "inval".
         { apply Hmbssn. } { iFrame "Heq". iFrame "inval". iFrame "P". }
@@ -158,7 +156,7 @@ Section FullBorrows.
       { rewrite lookup_insert_ne; trivial. rewrite lookup_delete_ne; trivial. }
       { unfold invalidated. rewrite bool_decide_eq_true. set_solver. }
       iDestruct (full_borrows_invalidated_via_insert_false with "inval") as "inval".
-      { apply lookup_delete. }
+      { apply lookup_delete_eq. }
       iDestruct (full_borrows_invalidated_via_delete_false with "inval") as "inval".
       { apply Hmbssn. } { unfold invalidated. rewrite bool_decide_eq_false. set_solver. }
       iFrame. iIntros "%Ht". done.
@@ -166,7 +164,7 @@ Section FullBorrows.
       iDestruct (full_borrows_invalidated_via_insert_false with "inval") as "inval".
       { rewrite lookup_insert_ne; trivial. rewrite lookup_delete_ne; trivial. }
       iDestruct (full_borrows_invalidated_via_insert_false with "inval") as "inval".
-      { apply lookup_delete. }
+      { apply lookup_delete_eq. }
       iDestruct (full_borrows_invalidated_via_delete_false with "inval") as "inval".
       { apply Hmbssn. } { unfold invalidated. rewrite bool_decide_eq_false. set_solver. }
       iFrame. iIntros "%Ht". exfalso. set_solver.
@@ -197,13 +195,13 @@ Section FullBorrows.
     - iDestruct ("P" with "[%]") as "P"; trivial.
     
       iApply full_borrows_revalidated_via_insert.
-        { rewrite lookup_delete; trivial. } iFrame.
+        { rewrite lookup_delete_eq; trivial. } iFrame.
         
       iApply full_borrows_revalidated_via_delete_false.
         { apply Hmbssn. } iFrame.
     -
       iApply full_borrows_revalidated_via_insert_false.
-        { rewrite lookup_delete; trivial. } 
+        { rewrite lookup_delete_eq; trivial. } 
         { unfold revalidated. rewrite bool_decide_eq_false. set_solver. }
         
       iApply full_borrows_revalidated_via_delete_false.
@@ -226,7 +224,7 @@ Section FullBorrows.
   Proof using invGS_gen0 Σ γ γd γo.
     replace (<[sn:=Borrow al al']> mbs) with (<[sn:=Borrow al al']> (delete sn mbs)).
       2: { apply map_eq. { intros i. destruct (decide (sn = i)).
-          - subst sn. rewrite lookup_insert. rewrite lookup_insert. trivial.
+          - subst sn. rewrite lookup_insert_eq. rewrite lookup_insert_eq. trivial.
           - rewrite lookup_insert_ne; trivial. rewrite lookup_insert_ne; trivial.
               rewrite lookup_delete_ne; trivial. } }
   

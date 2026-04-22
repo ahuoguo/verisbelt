@@ -502,8 +502,9 @@ Section type_sum.
           iApply (proph_eqz_modify (λ π, (pinj i (π ζ), pad))).
           { iApply proph_obs_true. intros π. trivial. }
           iDestruct (proph_ctrl_eqz with "PROPH ζPc") as "Eqz2".
+          have HInj : Inj eq eq (λ t : 𝔄l !!ₗ i, (pinj i t, pad))
+            by intros ?? ha; inversion ha as [hb]; apply pinj_Inj in hb; trivial.
           iDestruct (proph_eqz_constr (λ t, (pinj i t, pad)) with "Eqz2") as "Eqz3".
-          Unshelve. 2: { intros x y ha. inversion ha as [hb]. apply pinj_Inj in hb. trivial. }
           iApply (proph_eqz_eq with "Eqz3"); trivial.
           fun_ext. intros x. simpl. rewrite psum_map1_pinj. trivial.
         }

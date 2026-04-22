@@ -5,7 +5,7 @@ Require Import guarding.storage_protocol.protocol.
 Require Import stdpp.base.
 From iris.algebra Require Import cmra updates proofmode_classes auth.
 From iris.base_logic.lib Require Export own iprop invariants.
-From iris.proofmode Require Import base ltac_tactics tactics coq_tactics.
+From iris.proofmode Require Import base proofmode.
 
 (** Resource logic for implementing a RwLock **)
 

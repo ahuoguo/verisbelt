@@ -3,7 +3,7 @@ From iris.algebra Require Import cmra updates proofmode_classes auth functions g
 From iris.base_logic Require Import upred.
 From iris.base_logic.lib Require Import own iprop.
 From iris.base_logic.lib Require Import fancy_updates fancy_updates_from_vs.
-From iris.proofmode Require Import base ltac_tactics tactics coq_tactics reduction.
+From iris.proofmode Require Import base proofmode reduction.
 From iris.bi Require Import derived_laws_later derived_laws.
 Require Import guarding.internal.factoring_upred.
 

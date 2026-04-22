@@ -145,7 +145,7 @@ Lemma box_own_agree γ Q1 Q2 :
   box_own_prop γ Q1 ∗ box_own_prop γ Q2 ⊢ ▷ (Q1 ≡ Q2).
 Proof.
   rewrite /box_own_prop -own_op own_valid prod_validI /= and_elim_r.
-  by rewrite option_validI /= agree_validI agree_equivI later_equivI /=.
+  by rewrite option_validI /= agree_op_invI agree_equivI later_equivI /=.
 Qed.
 
 Lemma box_alloc : ⊢ box N ∅ True.
@@ -206,7 +206,7 @@ Proof.
   iModIntro. iSplitL "Hγ HQ"; first (iNext; iExists true; by iFrame).
   iModIntro; iNext; iExists Φ; iSplit.
   - by rewrite big_opM_insert_override.
-  - rewrite -insert_delete_insert big_opM_insert ?lookup_delete //.
+  - rewrite -insert_delete_eq big_opM_insert ?lookup_delete_eq //.
     iFrame; eauto.
 Qed.
 
@@ -226,7 +226,7 @@ Proof.
   iModIntro. iSplitL "Hγ"; first (iNext; iExists false; by repeat iSplit).
   iModIntro; iNext; iExists Φ; iSplit.
   - by rewrite big_opM_insert_override.
-  - rewrite -insert_delete_insert big_opM_insert ?lookup_delete //.
+  - rewrite -insert_delete_eq big_opM_insert ?lookup_delete_eq //.
     iFrame; eauto.
 Qed.
 
@@ -238,8 +238,8 @@ Proof.
   iIntros (?) "HQ Hbox".
   iMod (slice_insert_empty with "Hbox") as (γ ?) "[#Hslice Hbox]".
   iExists γ. iFrame "%#". iMod (slice_fill with "Hslice HQ Hbox"); first done.
-  - by apply lookup_insert.
-  - by rewrite insert_insert.
+  - by apply lookup_insert_eq.
+  - by rewrite insert_insert_eq.
 Qed.
 
 Lemma slice_delete_full E q f P Q γ :
@@ -251,8 +251,9 @@ Proof.
   iIntros (??) "#Hslice Hbox".
   iMod (slice_empty with "Hslice Hbox") as "[$ Hbox]"; try done.
   iMod (slice_delete_empty with "Hslice Hbox") as (P') "[Heq Hbox]"; first done.
-  { by apply lookup_insert. }
-  iExists P'. iFrame. rewrite -insert_delete_insert delete_insert ?lookup_delete //.
+  { by apply lookup_insert_eq. }
+  iExists P'. iFrame. rewrite -insert_delete_eq delete_insert_eq ?lookup_delete_eq //.
+  rewrite delete_delete_eq. by iFrame.
 Qed.
 
 Lemma box_fill E f P :
@@ -449,7 +450,7 @@ Proof.
   induction Qs as [|x T ? IHnone IHQs] using map_ind. 
   - intros Hmask. intros Htrue. iIntros "#slices box".
     iModIntro. rewrite big_sepM_empty. rewrite fmap_empty.
-    rewrite map_empty_union. iFrame. iModIntro. done.
+    rewrite (left_id ∅ (∪)). iFrame. iModIntro. done.
   - intros Hmask. intros Htrue. iIntros "#slices box".
     iMod (IHQs Hmask with "[] box") as "[map box]".
       { intros γ Q Hmγ.  have Ht := Htrue γ Q.
@@ -463,9 +464,9 @@ Proof.
         iApply "slices". iPureIntro. rewrite lookup_insert_ne; trivial.
       }
     iMod (slice_empty E q _ P T x Hmask with "[] box") as "[Q box]".
-      { rewrite lookup_union_r. { apply (Htrue x T). rewrite lookup_insert. trivial. }
+      { rewrite lookup_union_r. { apply (Htrue x T). rewrite lookup_insert_eq. trivial. }
         rewrite lookup_fmap. rewrite IHnone. trivial. }
-      { iApply "slices". iPureIntro. rewrite lookup_insert. trivial. }
+      { iApply "slices". iPureIntro. rewrite lookup_insert_eq. trivial. }
       iModIntro.
       iSplitL "map Q".
       { rewrite big_sepM_insert; last by trivial. iFrame. }
@@ -485,7 +486,7 @@ Proof.
   induction Qs as [|x T ? IHnone IHQs] using map_ind. 
   - intros Hmask. intros Htrue. iIntros "#slices map box".
     iModIntro. rewrite big_sepM_empty. rewrite fmap_empty.
-    rewrite map_empty_union. iFrame.
+    rewrite (left_id ∅ (∪)). iFrame.
   - intros Hmask. intros Htrue. iIntros "#slices map box".
     rewrite big_sepM_insert; last by trivial. iDestruct "map" as "[T map]".
     iMod (IHQs Hmask with "[] map box") as "box".
@@ -500,9 +501,9 @@ Proof.
         iApply "slices". iPureIntro. rewrite lookup_insert_ne; trivial.
       }
     iMod (slice_fill E q _ x P T Hmask with "[] T box") as "box".
-      { rewrite lookup_union_r. { apply (Htrue x T). rewrite lookup_insert. trivial. }
+      { rewrite lookup_union_r. { apply (Htrue x T). rewrite lookup_insert_eq. trivial. }
         rewrite lookup_fmap. rewrite IHnone. trivial. }
-      { iApply "slices". iPureIntro. rewrite lookup_insert. trivial. }
+      { iApply "slices". iPureIntro. rewrite lookup_insert_eq. trivial. }
       iModIntro.
       replace (<[x:=true]> (((λ _ : iProp Σ, true) <$> m) ∪ f))
           with (((λ _ : iProp Σ, true) <$> <[x:=T]> m) ∪ f); first by iFrame "box".

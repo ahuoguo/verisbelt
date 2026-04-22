@@ -24,6 +24,8 @@ Section inv_contexts.
   Context `{!invGS Σ, !llft_logicGS Σ}.
   Context `{!lrustGS Σ}.
   Context `{!uniqG Σ}.
+  Context `{!cnaInv_logicG Σ}.
+  Local Existing Instance cnaInv_na_inv_inG.
   Implicit Type (κ: lft).
   
   Definition ATOMIC_POOL : na_inv_pool_name := atomic_threadpool.
@@ -120,11 +122,12 @@ Section inv_contexts.
   
   Lemma invctx_alloc mask : ⊢ |==> ∃ tid, invctx_interp tid mask [] (InvCtx [] static AtomicClosed).
   Proof.
-      iIntros. iMod (cancellable_na_invariants.na_alloc) as (tid) "[na_own multi]".
+      iIntros. iMod cancellable_na_invariants.na_alloc as (tid) "[na_own multi]".
       iModIntro. iExists tid. iExists mask, ⊤.
       iSplit; first by (iPureIntro; set_solver).
-      unfold invctx_to_multiset. simpl. rewrite gmultiset_disj_union_right_id. iFrame.
-      iSplit. { iApply guards_refl. }
+      unfold invctx_to_multiset. simpl. rewrite gmultiset_disj_union_right_id.
+      iSplitL "multi".
+      { unfold cna_lifetimes. iFrame "multi". iApply guards_refl. }
       iSplit; last by done.
       replace (⊤) with (mask ∪ (⊤ ∖ mask)).
        - rewrite cancellable_na_invariants.na_own_union. iDestruct "na_own" as "[$ _]".

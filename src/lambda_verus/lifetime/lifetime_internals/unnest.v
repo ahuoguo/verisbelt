@@ -12,8 +12,6 @@ From iris.prelude Require Import options.
 From iris.base_logic.lib Require Export own iprop.
 From iris.proofmode Require Import base proofmode.
 From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 Section FullBorrows.
@@ -252,7 +250,7 @@ Section FullBorrows.
     iDestruct (get_all_modulo_dead_pers with "Modulo") as "[Modulo #Halldeadspers]".
     
     assert (sn ≠ sn2) as Hne2.
-      { intro Heq. subst sn2. rewrite lookup_insert in Hsn2None. discriminate. }
+      { intro Heq. subst sn2. rewrite lookup_insert_eq in Hsn2None. discriminate. }
     
     destruct pures as [Hdom [Hwf Hoc]].
     have swell_al := swell_set_of_map_wf _ _ _ _ _ _ _ _ Hwf Hmbssn.

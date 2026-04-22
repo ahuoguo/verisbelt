@@ -148,7 +148,7 @@ Proof.
   iIntros (Hstep Hel) "Hσ Hcred He". iMod (wptp_preservation with "Hσ Hcred He") as "Hwp"; first done.
   iModIntro. iApply (step_fupdN_wand with "Hwp").
   iMod 1 as (nt') "(Hσ & Ht)"; simplify_eq/=.
-  eapply elem_of_list_lookup in Hel as [i Hlook].
+  eapply list_elem_of_lookup in Hel as [i Hlook].
   destruct ((Φs ++ replicate nt' fork_post) !! i) as [Φ|] eqn: Hlook2; last first.
   { rewrite big_sepL2_alt. iDestruct "Ht" as "[%Hlen _]". exfalso.
     eapply lookup_lt_Some in Hlook. rewrite Hlen in Hlook.
@@ -191,6 +191,7 @@ Proof.
     with "[-]" as "H"; last first.
   { destruct steps_sum; [done|]. by iApply step_fupdN_S_fupd. }
   iApply (step_fupdN_wand with "H"). iIntros "$".
+  Unshelve. typeclasses eauto.
 Qed.
   
 (** Iris's generic adequacy result *)
@@ -249,6 +250,7 @@ Proof.
   iAssert (|={∅}▷=>^(steps_sum num_laters_per_step 1 n) |={∅}=> ⌜φ⌝)%I
     with "[-]" as "H"; last first.
   { destruct steps_sum; [done|]. by iApply step_fupdN_S_fupd. }
+  simpl.
   iApply (step_fupdN_wand with "H").
   iMod 1 as (nt') "(Hσ & Hval) /=".
   iDestruct (big_sepL2_app_inv_r with "Hval") as (es' t2' ->) "[Hes' Ht2']".
@@ -272,6 +274,7 @@ Proof.
   iDestruct (Hwp with "Hk") as "Hwp".
   iMod "Hwp" as (stateI Φ fork_post state_interp_mono) "(Hσ & Hwp & Hφ)".
   iModIntro. iExists _, _, _, _. iFrame.
+  Unshelve. typeclasses eauto.
 Qed.
 
 (** Adequacy when using later credits (the default) *)

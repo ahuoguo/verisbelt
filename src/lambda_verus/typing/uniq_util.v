@@ -59,7 +59,7 @@ Section uniq_util.
     set ζ := PrVar (at_locₛ 𝔄 ↾ prval_to_inh (@vπ (at_locₛ 𝔄) (l.1, x))) ζi.
     set ξ := PrVar (𝔄 ↾ prval_to_inh (@vπ 𝔄 x)) ξi.
     iMod (proph_resolve_toks _ ζ (λ π, (l.1, π ξ)) [ξ] with "PROPH ζtok [ξtok]") as "[ζObs ξtok]".
-      { set_solver. } { intros π π' asn. rewrite asn; trivial. apply elem_of_list_here. }
+      { set_solver. } { intros π π' asn. rewrite asn; trivial. apply list_elem_of_here. }
       { rewrite big_sepL_singleton. iFrame "ξtok". } rewrite big_sepL_singleton.
     iSpecialize ("ξPc" with "ξtok").
     
@@ -246,8 +246,8 @@ Section uniq_util.
     iDestruct (guards_transitive with "Guard2 Ghalf2") as "Incl".
     
     iDestruct (lft_bor_idx1 with "Bor") as "Bor".
+    have Hinh : Inhabited (~~ 𝔄) := populate x.
     iMod (llftl_bor_freeze with "LFT Bor") as (x') "Bor". { set_solver. }
-      Unshelve. 2: { split. apply x. }
     iMod (llftl_bor_freeze with "LFT Bor") as (d') "Bor". { set_solver. }
     iMod (llftl_bor_freeze with "LFT Bor") as (g') "Bor". { set_solver. }
     

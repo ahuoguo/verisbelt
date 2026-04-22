@@ -11,8 +11,6 @@ From iris.prelude Require Import options.
 From iris.base_logic.lib Require Export own iprop.
 From iris.proofmode Require Import base proofmode.
 From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 Section FullBorrows.
@@ -43,7 +41,7 @@ Section FullBorrows.
     replace (<[sn:=Unborrow bl al de]> mbs) with 
         (<[sn:=Unborrow bl al de]> (delete sn mbs)).
       2: { apply map_eq. { intros i. destruct (decide (sn = i)).
-          - subst sn. rewrite lookup_insert. rewrite lookup_insert. trivial.
+          - subst sn. rewrite lookup_insert_eq. rewrite lookup_insert_eq. trivial.
           - rewrite lookup_insert_ne; trivial. rewrite lookup_insert_ne; trivial.
               rewrite lookup_delete_ne; trivial. } }
   
@@ -73,7 +71,7 @@ Section FullBorrows.
     
     iSplitL "reval". {
       iApply full_borrows_revalidated_via_insert_false.
-      { apply lookup_delete. } { unfold revalidated. trivial. }
+      { apply lookup_delete_eq. } { unfold revalidated. trivial. }
       iApply full_borrows_revalidated_via_delete_false.
       { apply Hmbssn. } iFrame.
     }
@@ -325,13 +323,13 @@ Section FullBorrows.
     iIntros "[vs [dead #eq]]".
     iDestruct (llft_vs_for_unborrow_end alive dead outlives mbs mprops bl al de sn sn P P
         with "[vs dead eq]") as "X".
-      - apply Hsn. - apply lookup_delete. - apply Hsn2. - apply Hbl_a_outlives. - apply Hde.
+      - apply Hsn. - apply lookup_delete_eq. - apply Hsn2. - apply Hbl_a_outlives. - apply Hde.
       - trivial.
       - iFrame. iFrame "#". iIntros "[P _]". iModIntro. iFrame.
       - replace ((<[sn:=Borrow al de]> (delete sn mbs)))
           with ((<[sn:=Borrow al de]> mbs)).
           + iFrame "X".
-          + rewrite insert_delete_insert. trivial.
+          + rewrite insert_delete_eq. trivial.
   Qed.
   
   Lemma llft_vs_for_unborrow_end_atomic' k1 alive dead outlives mbs mprops bl al de sn sn2 Q :
@@ -675,7 +673,7 @@ Section FullBorrows.
       { replace (<[sn:=Borrow al de]> mbs) with (<[sn:=Borrow al de]> (delete sn mbs)).
         { apply map_wf_insert; trivial.
           apply (map_wf_delete_unborrow alive dead blocked bl al de); trivial. }
-        rewrite insert_delete_insert. trivial.
+        rewrite insert_delete_eq. trivial.
       }
       trivial.
     }

@@ -1,7 +1,7 @@
 From iris.prelude Require Import options.
 From iris.algebra Require Export cmra updates proofmode_classes.
 From iris.base_logic.lib Require Export own iprop.
-From iris.proofmode Require Import base ltac_tactics tactics coq_tactics reduction.
+From iris.proofmode Require Import base proofmode reduction.
 
 Class InternalPInv (A : Type) := pinv : A → Prop.
 Global Hint Mode InternalPInv ! : typeclass_instances.
@@ -308,7 +308,7 @@ Definition inved_protocol_ucmra_mixin {P}
     `{Equiv P, PCore P, Op P, InternalPInv P, Valid P, Unit P}
     {equ: Equivalence (≡@{P})}
     (internal_protocol_mixin: InternalProtocolMixin P) :
-      @UcmraMixin (InvedProtocol P)
+      @UcmraMixin _ (InvedProtocol P)
        (cmra_dist (inved_protocolR internal_protocol_mixin))
        (inved_protocol_equiv P)
        (inved_protocol_pcore P)
@@ -329,7 +329,7 @@ Canonical Structure inved_protocolUR {P}
     {equ: Equivalence (≡@{P})}
     (internal_protocol_mixin: InternalProtocolMixin P) : ucmra
     :=
-    @Ucmra'
+    @Ucmra' _
       (InvedProtocol P)
        (inved_protocol_equiv P)
        (cmra_dist (inved_protocolR internal_protocol_mixin))

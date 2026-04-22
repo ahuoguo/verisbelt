@@ -517,7 +517,7 @@ Section typing.
     }
     { iFrame. simpl.
       rewrite Heqc.
-      setoid_rewrite (heap_complete_mapsto_fancy_empty l').
+      iEval (setoid_rewrite (heap_complete_mapsto_fancy_empty l')).
       iFrame "ξBor". }
     iDestruct ("Halfback" with "H1 H2") as "X".
     iMod (fupd_mask_mono with "X") as "L". { set_solver. }
@@ -590,7 +590,7 @@ Section typing.
     }
     { iFrame. simpl.
       rewrite Heqc.
-      setoid_rewrite (heap_complete_mapsto_fancy_empty l').
+      iEval (setoid_rewrite (heap_complete_mapsto_fancy_empty l')).
       iFrame "ξBor". }
     iDestruct ("Halfback" with "H1 H2") as "X".
     iMod (fupd_mask_mono with "X") as "L". { set_solver. }

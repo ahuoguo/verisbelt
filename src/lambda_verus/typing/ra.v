@@ -10,7 +10,7 @@ Implicit Type 𝔄 𝔅: syn_type.
 Section Ra.
 
   Context `{!typeG Σ}.
-  Context `{G2: !inG Σ (@Ucmra' (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)}.
+  Context `{G2: !inG Σ (@Ucmra' _ (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)}.
 
   Hypothesis (𝔄_const  : ∀ (x : ~~𝔄) π1 π2 , @vπ 𝔄 x π1 = @vπ 𝔄 x π2).
 
@@ -63,7 +63,7 @@ Notation "RA_Validate: self" := (new [ #0])%E (at level 102, self at level 1): e
 Section RA_type.
 
   Context `{!typeG Σ}.
-  Context `{G2: !inG Σ (@Ucmra' (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3) }.
+  Context `{G2: !inG Σ (@Ucmra' _ (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3) }.
   Hypothesis (𝔄_const  : ∀ (x : ~~𝔄) π1 π2 , @vπ 𝔄 x π1 = @vπ 𝔄 x π2).
 
   Lemma typed_ra_alloc (p : path) (ty : type 𝔄) E L I :
@@ -154,9 +154,9 @@ Section RA_type.
     iSplitL.
     - iExists _; iSplitR => //=.
       iDestruct "Hown" as "(?&?&Hown1&Hown2)".
-      iFrame.
       repeat rewrite heap_mapsto_fancy_vec_nil.
-      by rewrite /ty_own/=!heap_mapsto_vec_nil !freeable_util.freeable_sz_full.
+      rewrite /ty_own/=!heap_mapsto_vec_nil !freeable_util.freeable_sz_full.
+      by iFrame.
     - iApply (proph_obs_impl with "Obs").
       intros π' [_ ].
       apply H0.
@@ -195,7 +195,7 @@ Section RA_type.
     +[self ◁ own_ptr 0 (ra_ty 𝔄_const); p ◁ own_ptr 0 (ghost_ty ty)]
     (RA_Update: self p)
     (λ v, +[v ◁ own_ptr 0 (ra_ty 𝔄_const)])
-    (λ post '-[(_, (γ, x)); (_, y)], λ mask π, (@cmra_update (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) x y) ∧ ∀ l, post -[(l, (γ, y))] mask π).
+    (λ post '-[(_, (γ, x)); (_, y)], λ mask π, (@cmra_update _ (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) x y) ∧ ∀ l, post -[(l, (γ, y))] mask π).
   Proof.
     move => tid postπ mask iκs vπl.
     iIntros "LFT TIME #PROPH UNIQ E L $ TY #Obs" => /=.
@@ -228,7 +228,7 @@ Section RA_type.
     +[self ◁ own_ptr 0 (ra_ty 𝔄_const); p ◁ own_ptr 0 (ghost_ty ty)]
     (RA_Update: self p)
     (λ v, +[v ◁ own_ptr 0 (ra_ty 𝔄_const)])
-    (λ post '-[(_, (γ, x)); (_, ys)], λ mask π, 0 < n ∧ (Vector.Forall (λ y, (@cmra_update (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) x y)) ys) ∧ ∀ l, Vector.Forall (λ y, post -[(l, (γ, y))] mask π) ys).
+    (λ post '-[(_, (γ, x)); (_, ys)], λ mask π, 0 < n ∧ (Vector.Forall (λ y, (@cmra_update _ (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) x y)) ys) ∧ ∀ l, Vector.Forall (λ y, post -[(l, (γ, y))] mask π) ys).
   Proof.
     move => tid postπ mask iκs vπl.
     fold indep_interp_of_syn_type.
@@ -263,7 +263,7 @@ Section RA_type.
       apply Hpost.
   Qed.
 
-  Let U := (@Ucmra' (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3).
+  Let U := (@Ucmra' _ (~~𝔄) 𝔄_equiv 𝔄_dist 𝔄_pcore 𝔄_op 𝔄_valid 𝔄_validn 𝔄_unit 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3).
 
   (* We need the RA to be discrete otherwise to use `own_valid`, otherwise we can't turn own γ x into a pure predicate because it's only valid uptil step index n *)
   Lemma typed_ra_validate `{! CmraDiscrete U } κ (self : path) E L I :
@@ -481,7 +481,7 @@ Section RA_type.
     +[self ◁ own_ptr 0 (ra_ty 𝔄_const); other ◁ shr_bor κ (ra_ty 𝔄_const); new_value ◁ own_ptr 0 (ghost_ty ty)]
     (RA_UpdateWithShr: self other new_value)
     (λ out, +[out ◁ own_ptr 0 (ra_ty 𝔄_const)])
-    (λ post '-[(l1, (γ1, x)); (l2, (γ2, y)); (_, z)], λ mask π, γ1 = γ2 ∧ (@cmra_update (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) (x ⋅ y) (z ⋅ y))  ∧ ∀ l, post -[(l, (γ1, z))] mask π).
+    (λ post '-[(l1, (γ1, x)); (l2, (γ2, y)); (_, z)], λ mask π, γ1 = γ2 ∧ (@cmra_update _ (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) (x ⋅ y) (z ⋅ y))  ∧ ∀ l, post -[(l, (γ1, z))] mask π).
   Proof.
     move => Alv tid postπ mask iκs vπl.
     iIntros "LFT #TIME #PROPH UNIQ E L $ TY #Obs" => /=.
@@ -542,7 +542,7 @@ Section RA_type.
     +[self ◁ own_ptr 0 (ra_ty 𝔄_const); other ◁ shr_bor κ (ra_ty 𝔄_const); new_values ◁ own_ptr 0 (ghost_ty ty)]
     (RA_UpdateWithShrNonDet: self other new_values)
     (λ out, +[out ◁ own_ptr 0 (ra_ty 𝔄_const)])
-    (λ post '-[(l1, (γ1, x)); (l2, (γ2, y)); (_, zs)], λ mask π, γ1 = γ2 ∧ 0 < n ∧ (Vector.Forall (λ z, (@cmra_update (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) (x ⋅ y) (z ⋅ y))) zs)  ∧ ∀ l, Vector.Forall (λ z, post -[(l, (γ1, z))] mask π) zs ).
+    (λ post '-[(l1, (γ1, x)); (l2, (γ2, y)); (_, zs)], λ mask π, γ1 = γ2 ∧ 0 < n ∧ (Vector.Forall (λ z, (@cmra_update _ (ucmra_cmraR (Ucmra' (~~ 𝔄) 𝔄_mixin1 𝔄_mixin2 𝔄_mixin3)) (x ⋅ y) (z ⋅ y))) zs)  ∧ ∀ l, Vector.Forall (λ z, post -[(l, (γ1, z))] mask π) zs ).
   Proof.
     move => Alv tid postπ mask iκs vπl.
     iIntros "LFT #TIME #PROPH UNIQ E L $ TY #Obs" => /=.

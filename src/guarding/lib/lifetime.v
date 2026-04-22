@@ -9,10 +9,8 @@ From iris.algebra Require Import excl.
 From iris.prelude Require Import options.
 
 From iris.base_logic.lib Require Export own iprop.
-From iris.proofmode Require Import base.
-From iris.proofmode Require Import ltac_tactics.
-From iris.proofmode Require Import tactics.
-From iris.proofmode Require Import coq_tactics.
+From iris.proofmode Require Import base proofmode.
+From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 (** Leaf Lifetime Logic. Based loosely on RustBelt's lifetime logic. *)
@@ -214,7 +212,7 @@ Section LlftHelperResources.
             rewrite multiplicity_disj_union.
             rewrite multiplicity_disj_union.
             rewrite elem_of_singleton in m_k. rewrite m_k.
-            rewrite multiplicity_singleton.
+            rewrite multiplicity_singleton_eq.
             have fmk := fm k. destruct fmk as [_ fmk0].
             rewrite gmultiset_disj_union_left_id in fmk0.
             rewrite fmk0; trivial.
@@ -262,7 +260,7 @@ Section LlftHelperResources.
         exfalso.
         destruct fmk as [_ fmk]. have fmk1 := fmk n. subst a.
         rewrite multiplicity_disj_union in fmk1.
-        rewrite multiplicity_singleton in fmk1. lia.
+        rewrite multiplicity_singleton_eq in fmk1. lia.
     - inversion lts.
     - inversion lts.
   Qed.
@@ -360,7 +358,7 @@ Section LlftHelperResources.
             * exfalso. apply m_not_in_sa. apply h.
             * rewrite multiplicity_disj_union in fmm1.
               have fmm1i := fmm1 h.
-              rewrite elem_of_singleton in mk. subst m. rewrite multiplicity_singleton in fmm1i.
+              rewrite elem_of_singleton in mk. subst m. rewrite multiplicity_singleton_eq in fmm1i.
                 rewrite multiplicity_empty in fmm1i. lia.
           + have fmm2i := fmm2 n.
             rewrite multiplicity_disj_union in fmm2i.
@@ -411,7 +409,7 @@ Section LlftHelperResources.
       rewrite multiplicity_disj_union.
       rewrite elem_of_union in is_in. destruct is_in as [ix|ib].
       + rewrite elem_of_singleton in ix. subst x. rewrite mult_list_to_set_disj_not_in; trivial.
-          rewrite multiplicity_singleton. trivial.
+          rewrite multiplicity_singleton_eq. trivial.
       + rewrite (IH ib). rewrite multiplicity_singleton_ne; trivial. intro x_eq_y.
           subst x. contradiction.
   Qed.

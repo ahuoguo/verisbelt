@@ -8,7 +8,7 @@ From iris.base_logic.lib Require Export own iprop.
 
 From iris.algebra Require Import auth.
 
-From iris.proofmode Require Export tactics.
+From iris.proofmode Require Export proofmode.
 
 Section ConjunctOwnRule.
 
@@ -16,7 +16,7 @@ Context {Σ: gFunctors}.
 Context `{i : !inG Σ A}.
 Implicit Types a : A.
 
-Context `{Disc : CmraDiscrete A}.
+Context {Disc : CmraDiscrete A}.
 
 Definition project (x: iResUR Σ) (γ: gname) : option A :=
   match (x (inG_id i) !! γ) with
@@ -70,8 +70,8 @@ Lemma project_iRes_singleton (x: A) (γ: gname)
   : project (own.iRes_singleton γ x) γ ≡ Some x.
 Proof.
   unfold project, own.iRes_singleton.
-  setoid_rewrite discrete_fun_lookup_singleton.
-  rewrite lookup_singleton.
+  rewrite discrete_fun_lookup_singleton.
+  rewrite lookup_singleton_eq.
   f_equiv.
   setoid_rewrite own.inG_fold_unfold.
   rewrite cmra_transport_trans eq_trans_sym_inv_r /=.
@@ -162,13 +162,13 @@ Proof.
     apply equiv_dist.
     intros x'.
     have h : Decision (inG_id i = x') by solve_decision. destruct h.
-    + setoid_rewrite discrete_fun_lookup_op. subst x'.
-      setoid_rewrite discrete_fun_lookup_singleton.
-      setoid_rewrite discrete_fun_lookup_insert.
+    + rewrite discrete_fun_lookup_op. subst x'.
+      rewrite discrete_fun_lookup_singleton.
+      rewrite discrete_fun_lookup_insert.
       intro γ0.
       have h1 : Decision (γ = γ0) by solve_decision. destruct h1.
-      * subst γ0. rewrite lookup_op. rewrite lookup_delete.
-        rewrite lookup_singleton. rewrite e.
+      * subst γ0. rewrite lookup_op. rewrite lookup_delete_eq.
+        rewrite lookup_singleton_eq. rewrite e.
         unfold "⋅", cmra_op, optionR, option_op_instance, union_with, option_union_with.
         f_equiv.
         setoid_rewrite <- X.
@@ -180,9 +180,9 @@ Proof.
         destruct (w (inG_id i) !! γ0) eqn:s.
         ++ rewrite s. trivial.
         ++ rewrite s. trivial.
-    + setoid_rewrite discrete_fun_lookup_op.
-      setoid_rewrite discrete_fun_lookup_singleton_ne; trivial.
-      setoid_rewrite discrete_fun_lookup_insert_ne; trivial.
+    + rewrite discrete_fun_lookup_op.
+      rewrite discrete_fun_lookup_singleton_ne; trivial.
+      rewrite discrete_fun_lookup_insert_ne; trivial.
       symmetry.
       apply ucmra_unit_left_id.
   - inversion p.
@@ -313,29 +313,34 @@ Proof.
         (inG_id i)
         (delete γ (p1 (inG_id i)))
         p1).
+    rewrite /own.iRes_singleton.
     apply equiv_dist.
     intros x'.
     have h : Decision (inG_id i = x') by solve_decision. destruct h.
     + setoid_rewrite discrete_fun_lookup_op. subst x'.
-      setoid_rewrite discrete_fun_lookup_singleton.
-      setoid_rewrite discrete_fun_lookup_insert.
+      rewrite discrete_fun_lookup_singleton.
+      rewrite discrete_fun_lookup_insert.
       intro γ0.
       have h1 : Decision (γ = γ0) by solve_decision. destruct h1.
-      * subst γ0. rewrite lookup_op. rewrite lookup_delete.
-          rewrite lookup_insert.
-        rewrite op_None_right_id.
-        rewrite lookup_singleton. trivial.
-      * rewrite lookup_insert_ne; trivial. 
-        rewrite lookup_op.
-        rewrite lookup_singleton_ne; trivial. rewrite op_None_left_id.
-        rewrite lookup_delete_ne; trivial.
-    + setoid_rewrite discrete_fun_lookup_op.
-      setoid_rewrite discrete_fun_lookup_singleton_ne; trivial.
-      setoid_rewrite discrete_fun_lookup_insert_ne; trivial.
+      * subst γ0. rewrite lookup_op.
+        rewrite discrete_fun_lookup_insert; trivial.
+        rewrite lookup_insert_eq; trivial. 
+        rewrite lookup_delete_eq.
+        rewrite lookup_singleton_eq; trivial.
+      * rewrite lookup_op. 
+      rewrite discrete_fun_lookup_insert; trivial.
+      rewrite lookup_insert_ne; trivial. 
+      rewrite lookup_delete_ne; trivial.
+      rewrite lookup_singleton_ne; trivial.
+      rewrite ucmra_unit_left_id; trivial.
+    + rewrite discrete_fun_lookup_op.
+      rewrite discrete_fun_lookup_singleton_ne; trivial.
+      rewrite discrete_fun_lookup_insert_ne; trivial.
+      rewrite discrete_fun_lookup_insert_ne; trivial.
       symmetry.
       apply ucmra_unit_left_id.
 Qed.
-            
+
 Lemma Some_incl_Some_Some_to_iRes_singleton_incl (a b c : A) n γ
             (sincl: Some a ≼{n} Some b ⋅ Some c) :
             (own.iRes_singleton γ a ≼{n} own.iRes_singleton γ b ⋅ own.iRes_singleton γ c).
@@ -434,12 +439,13 @@ Proof using A Disc i Σ.
   - apply equiv_dist.
     intros x'.
     have h : Decision (inG_id i = x') by solve_decision. destruct h.
-    + setoid_rewrite discrete_fun_lookup_op. subst x'.
-      setoid_rewrite discrete_fun_lookup_singleton.
-      setoid_rewrite discrete_fun_lookup_insert.
+    + rewrite discrete_fun_lookup_op. subst x'.
+      rewrite /own.iRes_singleton.
+      rewrite discrete_fun_lookup_singleton.
+      rewrite discrete_fun_lookup_insert.
       intro γ0.
       have h1 : Decision (γ = γ0) by solve_decision. destruct h1.
-      * subst γ0. rewrite lookup_op. rewrite lookup_insert. rewrite lookup_insert.
+      * subst γ0. rewrite lookup_op. rewrite lookup_insert_eq. rewrite lookup_insert_eq.
         unfold "⋅", cmra_op, optionR, option_op_instance, union_with, option_union_with.
         unfold project in p1eqn.
         destruct (p1 (inG_id i) !! γ) eqn:p1eqn'; try discriminate.
@@ -456,9 +462,10 @@ Proof using A Disc i Σ.
         rewrite lookup_empty.
         rewrite op_None_left_id.
         trivial.
-    + setoid_rewrite discrete_fun_lookup_op.
-      setoid_rewrite discrete_fun_lookup_singleton_ne; trivial.
-      setoid_rewrite discrete_fun_lookup_insert_ne; trivial.
+    + rewrite discrete_fun_lookup_op.
+      rewrite /own.iRes_singleton.
+      rewrite discrete_fun_lookup_singleton_ne; trivial.
+      rewrite discrete_fun_lookup_insert_ne; trivial.
       apply ucmra_unit_left_id.
   - have ineq1 := discrete_fun_insert_incl_iRes_singleton n m p1 γ.
     destruct (project p2 γ) as [c0|] eqn:p2eqn.
@@ -478,7 +485,7 @@ Context {Σ: gFunctors}.
 Context {A: ucmra}.
 Context `{i : !inG Σ A}.
 Implicit Types a : A.
-Context `{Disc : CmraDiscrete A}.
+Context {Disc : CmraDiscrete A}.
 
 Lemma incl_opq (x: A) (a: option A)
   : x ≼ x ⋅? a.

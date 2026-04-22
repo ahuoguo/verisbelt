@@ -115,7 +115,7 @@ Section atomic_util.
   Lemma atomic_lock_ctr_alloc : ⊢ |==> ∃ γ , atomic_lock_ctr γ 0 ⊤. 
   Proof.
     simpl.
-    iMod own_alloc as "[% H]"; last by iFrame.
+    iMod (own_alloc (AlcAuth 0 (⊤ ∖ ⊤) : alcUR)) as "[% H]"; last by iFrame.
     replace (⊤ ∖ ⊤) with (∅: coPset) by set_solver. done.
   Qed.
 

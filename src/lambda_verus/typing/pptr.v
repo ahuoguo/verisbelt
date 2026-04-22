@@ -220,7 +220,6 @@ Section typing.
       iExists _, (S (S d)).
       do 2 iSplit => //=.
       iSplitL => //.
-      iFrame.
       rewrite -heap_mapsto_vec_singleton.
       rewrite -!(heap_mapsto_fancy_fmap_eq l').
       iFrame.
@@ -390,7 +389,7 @@ Section typing.
       iFrame. iApply (persistent_time_receipt_mono with "⧖2'"). lia.
      }
      { iFrame. simpl.
-       setoid_rewrite (heap_complete_mapsto_fancy_empty cl).
+       iEval (setoid_rewrite (heap_complete_mapsto_fancy_empty cl)).
        iFrame "ξBor". }
     iDestruct ("Halfback" with "H1 H2") as "X".
     iMod (fupd_mask_mono with "X") as "L". { set_solver. }

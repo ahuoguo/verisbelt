@@ -18,13 +18,9 @@ Inductive expr :=
 | App (e : expr) (el : list expr)
 | Read (o : order) (e : expr)
 | Write (o : order) (e1 e2: expr)
-| CAS (e0 e1 e2 : expr)
 | Alloc (e : expr)
 | Free (e1 e2 : expr)
 | Case (e : expr) (el : list expr)
-| Fork (e : expr)
-| GlobalLock
-| GlobalUnlock
 .
 
 Fixpoint to_expr (e : expr) : lang.expr :=
@@ -39,13 +35,9 @@ Fixpoint to_expr (e : expr) : lang.expr :=
   | App e el => lang.App (to_expr e) (map to_expr el)
   | Read o e => lang.Read o (to_expr e)
   | Write o e1 e2 => lang.Write o (to_expr e1) (to_expr e2)
-  | CAS e0 e1 e2 => lang.CAS (to_expr e0) (to_expr e1) (to_expr e2)
   | Alloc e => lang.Alloc (to_expr e)
   | Free e1 e2 => lang.Free (to_expr e1) (to_expr e2)
   | Case e el => lang.Case (to_expr e) (map to_expr el)
-  | Fork e => lang.Fork (to_expr e)
-  | GlobalLock => lang.GlobalLock
-  | GlobalUnlock => lang.GlobalUnlock
   end.
 
 Ltac of_expr e :=
@@ -61,22 +53,16 @@ Ltac of_expr e :=
   | lang.Read ?o ?e => let e := of_expr e in constr:(Read o e)
   | lang.Write ?o ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(Write o e1 e2)
-  | lang.CAS ?e0 ?e1 ?e2 =>
-     let e0 := of_expr e0 in let e1 := of_expr e1 in let e2 := of_expr e2 in
-     constr:(CAS e0 e1 e2)
   | lang.Alloc ?e => let e := of_expr e in constr:(Alloc e)
   | lang.Free ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(Free e1 e2)
   | lang.Case ?e ?el =>
      let e := of_expr e in let el := of_expr el in constr:(Case e el)
-  | lang.Fork ?e => let e := of_expr e in constr:(Fork e)
   | @nil lang.expr => constr:(@nil expr)
   | @cons lang.expr ?e ?el =>
     let e := of_expr e in let el := of_expr el in constr:(e::el)
   | to_expr ?e => e
   | of_val ?v => constr:(Val v (of_val v) (to_of_val v))
-  | lang.GlobalLock => constr:(GlobalLock)
-  | lang.GlobalUnlock => constr:(GlobalUnlock)
   | _ => match goal with
          | H : to_val e = Some ?v |- _ => constr:(Val v e H)
          | H : Closed [] e |- _ => constr:(@ClosedExpr e H)
@@ -87,13 +73,12 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   match e with
   | Val _ _ _ | ClosedExpr _ => true
   | Var x => bool_decide (x ∈ X)
-  | Lit _ | NdInt | GlobalLock | GlobalUnlock => true
+  | Lit _ | NdInt => true
   | Rec f xl e => is_closed (f :b: xl +b+ X) e
   | BinOp _ e1 e2 | Write _ e1 e2 | Free e1 e2 =>
     is_closed X e1 && is_closed X e2
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
-  | Read _ e | Alloc e | Fork e => is_closed X e
-  | CAS e0 e1 e2 => is_closed X e0 && is_closed X e1 && is_closed X e2
+  | Read _ e | Alloc e => is_closed X e
   end.
 Lemma is_closed_correct X e : is_closed X e → lang.is_closed X (to_expr e).
 Proof.
@@ -141,13 +126,9 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | App e el => App (subst x es e) (map (subst x es) el)
   | Read o e => Read o (subst x es e)
   | Write o e1 e2 => Write o (subst x es e1) (subst x es e2)
-  | CAS e0 e1 e2 => CAS (subst x es e0) (subst x es e1) (subst x es e2)
   | Alloc e => Alloc (subst x es e)
   | Free e1 e2 => Free (subst x es e1) (subst x es e2)
   | Case e el => Case (subst x es e) (map (subst x es) el)
-  | Fork e => Fork (subst x es e)
-  | GlobalLock => GlobalLock
-  | GlobalUnlock => GlobalUnlock
   end.
 Lemma to_expr_subst x er e :
   to_expr (subst x er e) = lang.subst x (to_expr er) (to_expr e).
@@ -163,8 +144,6 @@ Definition is_atomic (e: expr) : bool :=
   | Read (ScOrd | Na2Ord) e | Alloc e => bool_decide (is_Some (to_val e))
   | Write (ScOrd | Na2Ord) e1 e2 | Free e1 e2 =>
     bool_decide (is_Some (to_val e1) ∧ is_Some (to_val e2))
-  | CAS e0 e1 e2 =>
-    bool_decide (is_Some (to_val e0) ∧ is_Some (to_val e1) ∧ is_Some (to_val e2))
   | _ => false
   end.
 Lemma is_atomic_correct e : is_atomic e → Atomic WeaklyAtomic (to_expr e).
@@ -172,8 +151,7 @@ Proof.
   intros He. apply ectx_language_atomic.
   - intros σ e' σ' ef.
     destruct e; simpl; try done; repeat (case_match; try done);
-    inversion 1; try (apply val_irreducible; rewrite ?language.to_of_val; naive_solver eauto); [].
-    rewrite -[stuck_term](fill_empty). apply stuck_irreducible.
+    inversion 1; try (apply val_irreducible; rewrite ?language.to_of_val; naive_solver eauto).
   - apply ectxi_language_sub_redexes_are_values=> /= Ki e' Hfill.
     revert He. destruct e; simpl; try done; repeat (case_match; try done);
     rewrite ?bool_decide_spec;
@@ -276,10 +254,6 @@ Ltac reshape_expr e tac :=
   | Write ?o ?e1 ?e2 =>
     reshape_val e1 ltac:(fun v1 => go (WriteRCtx o v1 :: K) e2)
   | Write ?o ?e1 ?e2 => go (WriteLCtx o e2 :: K) e1
-  | CAS ?e0 ?e1 ?e2 => reshape_val e0 ltac:(fun v0 => first
-     [ reshape_val e1 ltac:(fun v1 => go (CasRCtx v0 v1 :: K) e2)
-     | go (CasMCtx v0 e2 :: K) e1 ])
-  | CAS ?e0 ?e1 ?e2 => go (CasLCtx e1 e2 :: K) e0
   | Alloc ?e => go (AllocCtx :: K) e
   | Free ?e1 ?e2 => reshape_val e1 ltac:(fun v1 => go (FreeRCtx v1 :: K) e2)
   | Free ?e1 ?e2 => go (FreeLCtx e2 :: K) e1

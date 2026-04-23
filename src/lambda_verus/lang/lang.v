@@ -38,13 +38,9 @@ Inductive expr :=
 | App (e : expr) (el : list expr)
 | Read (o : order) (e : expr)
 | Write (o : order) (e1 e2: expr)
-| CAS (e0 e1 e2 : expr)
 | Alloc (e : expr)
 | Free (e1 e2 : expr)
-| Case (e : expr) (el : list expr)
-| Fork (e : expr)
-| GlobalLock
-| GlobalUnlock.
+| Case (e : expr) (el : list expr).
 
 Arguments App _%E _%E.
 Arguments Case _%E _%E.
@@ -52,13 +48,12 @@ Arguments Case _%E _%E.
 Fixpoint is_closed (X : list string) (e : expr) : bool :=
   match e with
   | Var x => bool_decide (x ∈ X)
-  | Lit _ | NdInt | GlobalLock | GlobalUnlock => true
+  | Lit _ | NdInt => true
   | Rec f xl e => is_closed (f :b: xl +b+ X) e
   | BinOp _ e1 e2 | Write _ e1 e2 | Free e1 e2 =>
     is_closed X e1 && is_closed X e2
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
-  | Read _ e | Alloc e | Fork e => is_closed X e
-  | CAS e0 e1 e2 => is_closed X e0 && is_closed X e1 && is_closed X e2
+  | Read _ e | Alloc e => is_closed X e
   end.
 
 Class Closed (X : list string) (e : expr) := closed : is_closed X e.
@@ -106,9 +101,6 @@ Inductive ectx_item :=
 | ReadCtx (o : order)
 | WriteLCtx (o : order) (e2 : expr)
 | WriteRCtx (o : order) (v1 : val)
-| CasLCtx (e1 e2: expr)
-| CasMCtx (v0 : val) (e2 : expr)
-| CasRCtx (v0 : val) (v1 : val)
 | AllocCtx
 | FreeLCtx (e2 : expr)
 | FreeRCtx (v1 : val)
@@ -123,9 +115,6 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | ReadCtx o => Read o e
   | WriteLCtx o e2 => Write o e e2
   | WriteRCtx o v1 => Write o (of_val v1) e
-  | CasLCtx e1 e2 => CAS e e1 e2
-  | CasMCtx v0 e2 => CAS (of_val v0) e e2
-  | CasRCtx v0 v1 => CAS (of_val v0) (of_val v1) e
   | AllocCtx => Alloc e
   | FreeLCtx e2 => Free e e2
   | FreeRCtx v1 => Free (of_val v1) e
@@ -144,13 +133,9 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | App e el => App (subst x es e) (map (subst x es) el)
   | Read o e => Read o (subst x es e)
   | Write o e1 e2 => Write o (subst x es e1) (subst x es e2)
-  | CAS e0 e1 e2 => CAS (subst x es e0) (subst x es e1) (subst x es e2)
   | Alloc e => Alloc (subst x es e)
   | Free e1 e2 => Free (subst x es e1) (subst x es e2)
   | Case e el => Case (subst x es e) (map (subst x es) el)
-  | Fork e => Fork (subst x es e)
-  | GlobalLock => GlobalLock
-  | GlobalUnlock => GlobalUnlock
   end.
 
 Definition subst' (mx : binder) (es : expr) : expr → expr :=
@@ -294,41 +279,6 @@ Inductive head_step : expr → state → list Empty_set → expr → state → l
               []
               (Lit LitPoison) ((<[l:=(RSt 0, v)]>σ.1, σ.2))
               []
-| CasFailS l n e1 lit1 e2 lit2 litl σ :
-    to_val e1 = Some $ LitV lit1 → to_val e2 = Some $ LitV lit2 →
-    σ.1 !! l = Some (RSt n, LitV litl) →
-    lit_neq lit1 litl →
-    head_step (CAS (Lit $ LitLoc l) e1 e2) σ [] (Lit $ lit_of_bool false) σ  []
-| CasSucS l e1 lit1 e2 lit2 litl σ :
-    to_val e1 = Some $ LitV lit1 → to_val e2 = Some $ LitV lit2 →
-    σ.1 !! l = Some (RSt 0, LitV litl) →
-    lit_eq σ lit1 litl →
-    head_step (CAS (Lit $ LitLoc l) e1 e2) σ
-              []
-              (Lit $ lit_of_bool true) (<[l:=(RSt 0, LitV lit2)]>σ.1, σ.2)
-              []
-(* A succeeding CAS has to detect concurrent non-atomic read accesses, and
-   trigger UB if there is one.  In lambdaRust, succeeding and failing CAS are
-   not mutually exclusive, so it could happen that a CAS can both fail (and
-   hence not be stuck) but also succeed (and hence be racing with a concurrent
-   non-atomic read).  In that case, we have to explicitly reduce to a stuck
-   state; due to the possibility of failing CAS, we cannot rely on the current
-   state being stuck like we could in a language where failing and succeeding
-   CAS are mutually exclusive.
-
-   This means that CAS is atomic (it always reducs to an irreducible
-   expression), but not strongly atomic (it does not always reduce to a value).
-
-   If there is a concurrent non-atomic write, the CAS itself is stuck: All its
-   reductions are blocked.  *)
-| CasStuckS l n e1 lit1 e2 lit2 litl σ :
-    to_val e1 = Some $ LitV lit1 → to_val e2 = Some $ LitV lit2 →
-    σ.1 !! l = Some (RSt n, LitV litl) → 0 < n →
-    lit_eq σ lit1 litl →
-    head_step (CAS (Lit $ LitLoc l) e1 e2) σ
-              []
-              stuck_term σ
-              []
 | AllocS n l σ :
     0 < n →
     (∀ m, σ.1 !! (l +ₗ m) = None) →
@@ -343,24 +293,10 @@ Inductive head_step : expr → state → list Empty_set → expr → state → l
               []
               (Lit LitPoison) (free_mem l (Z.to_nat n) $σ σ)
               []
-              | GlobalLockS σ:
-    head_step (GlobalLock) σ
-              []
-              (Lit (LitInt (if σ.2 then 1 else 0))) (σ.1, true)
-              []
-| GlobalUnlockS σ:
-    σ.2 = true →
-    head_step (GlobalUnlock) σ
-              []
-              (Lit LitPoison) (σ.1, false)
-              []
 | CaseS i el e σ :
     0 ≤ i →
     el !! (Z.to_nat i) = Some e →
-    head_step (Case (Lit $ LitInt i) el) σ [] e σ []
-| ForkS e σ:
-    head_step (Fork e) σ [] (Lit LitPoison) σ [e]
-    .
+    head_step (Case (Lit $ LitInt i) el) σ [] e σ [].
 
 (** Basic properties about the language *)
 Lemma to_of_val v : to_val (of_val v) = Some v.
@@ -410,8 +346,8 @@ Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
   to_val e1 = None → to_val e2 = None →
   fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
 Proof.
-  destruct Ki1 as [| | |v1 vl1 el1| | | | | | | | | |],
-           Ki2 as [| | |v2 vl2 el2| | | | | | | | | |];
+  destruct Ki1 as [| | |v1 vl1 el1| | | | | | |],
+           Ki2 as [| | |v2 vl2 el2| | | | | | |];
   intros He1 He2 EQ; try discriminate; simplify_eq/=;
     repeat match goal with
     | H : to_val (of_val _) = None |- _ => by rewrite to_of_val in H
@@ -587,24 +523,20 @@ Fixpoint expr_beq (e : expr) (e' : expr) : bool :=
   | BinOp op e1 e2, BinOp op' e1' e2' =>
     bool_decide (op = op') && expr_beq e1 e1' && expr_beq e2 e2'
   | NdInt, NdInt => true
-  | GlobalLock, GlobalLock => true
-  | GlobalUnlock, GlobalUnlock => true
   | App e el, App e' el' | Case e el, Case e' el' =>
     expr_beq e e' && expr_list_beq el el'
   | Read o e, Read o' e' => bool_decide (o = o') && expr_beq e e'
   | Write o e1 e2, Write o' e1' e2' =>
     bool_decide (o = o') && expr_beq e1 e1' && expr_beq e2 e2'
-  | CAS e0 e1 e2, CAS e0' e1' e2' =>
-    expr_beq e0 e0' && expr_beq e1 e1' && expr_beq e2 e2'
-  | Alloc e, Alloc e' | Fork e, Fork e' => expr_beq e e'
+  | Alloc e, Alloc e' => expr_beq e e'
   | Free e1 e2, Free e1' e2' => expr_beq e1 e1' && expr_beq e2 e2'
   | _, _ => false
   end.
 Lemma expr_beq_correct (e1 e2 : expr) : expr_beq e1 e2 ↔ e1 = e2.
 Proof.
   revert e1 e2; fix FIX 1.
-    destruct e1 as [| | | | |? el1| | | | | |? el1| | |],
-             e2 as [| | | | |? el2| | | | | |? el2| | |]; simpl; try done;
+    destruct e1 as [| | | | |? el1| | | | |? el1],
+             e2 as [| | | | |? el2| | | | |? el2]; simpl; try done;
   rewrite ?andb_True ?bool_decide_spec ?FIX;
   try (split; intro; [destruct_and?|split_and?]; congruence).
   - match goal with |- context [?F el1 el2] => assert (F el1 el2 ↔ el1 = el2) end.

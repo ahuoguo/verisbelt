@@ -68,12 +68,10 @@ src/lambda_verus/lang/lang.v
 src/lambda_verus/lang/lifting.v
 src/lambda_verus/lang/notation.v
 src/lambda_verus/lang/proofmode.v
-src/lambda_verus/lang/races.v
 src/lambda_verus/lang/tactics.v
 src/lambda_verus/lang/time.v
 src/lambda_verus/lang/lib/new_delete.v
 src/lambda_verus/lang/lib/memcpy.v
-src/lambda_verus/lang/lib/spawn.v
 
 # Type-specs
 
@@ -90,7 +88,6 @@ src/lambda_verus/typing/product.v
 src/lambda_verus/typing/programs.v
 src/lambda_verus/typing/programs_util.v
 src/lambda_verus/typing/programs_util_own.v
-src/lambda_verus/typing/programs_util_atomic.v
 src/lambda_verus/typing/bool.v
 src/lambda_verus/typing/int.v
 src/lambda_verus/typing/shr_bor.v
@@ -111,11 +108,9 @@ src/lambda_verus/typing/sum.v
 src/lambda_verus/typing/ra.v
 src/lambda_verus/typing/protocol.v
 src/lambda_verus/typing/local_inv.v
-src/lambda_verus/typing/atomic_inv.v
 src/lambda_verus/typing/function.v
 src/lambda_verus/typing/base_type.v
 src/lambda_verus/typing/fixpoint.v
-src/lambda_verus/typing/spawn.v
 src/lambda_verus/typing/soundness.v
 
 src/lambda_verus/typing/examples/assert.v

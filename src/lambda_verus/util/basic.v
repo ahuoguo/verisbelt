@@ -1,4 +1,4 @@
-Require Export Equality FunctionalExtensionality.
+From Stdlib Require Export Equality FunctionalExtensionality.
 From iris.algebra Require Import ofe.
 From iris.proofmode Require Import proofmode.
 

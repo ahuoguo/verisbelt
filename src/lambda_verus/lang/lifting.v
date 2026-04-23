@@ -306,16 +306,6 @@ Proof.
   iApply ("Hwp" with "£ ⧖S").
 Qed.
 
-(** Base axioms for core primitives of the language: Stateless reductions *)
-Lemma wp_fork E e :
-  {{{ ▷ WP e {{ _, True }} }}} Fork e @ E {{{ RET LitV LitPoison; True }}}.
-Proof.
-  iIntros (?) "?HΦ". iApply wp_lift_atomic_base_step; [done|].
-  iIntros (σ1 stepcnt κ κs n) "[Hσ Ht] !>"; iSplit; first by eauto.
-  iNext; iIntros (v2 σ2 efs Hstep); inv_head_step. iFrame.
-  iMod (time_interp_step with "Ht") as "$". iIntros "credit". by iApply "HΦ".
-Qed.
-
 (** Pure reductions *)
 Local Ltac solve_exec_safe :=
   intros; destruct_and?; subst; do 3 eexists; econstructor; simpl; eauto with lia.
@@ -680,108 +670,6 @@ Proof.
     unfold heap_mapsto. iFrame "pt'".
   }
   iModIntro. iApply "post". iFrame.
-Qed.
-
-Lemma wp_cas_int_fail_guarded  E l c z1 e2 lit2 zl d G :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) → z1 ≠ zl →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ LitV (LitInt zl) ∗ £(3 * d + 1) }}}
-    CAS (Lit $ LitLoc l) (Lit $ LitInt z1) e2 @ E
-    {{{ RET LitV $ LitInt 0; G ∗ (l,c) #↦ LitV (LitInt zl) }}}.
-Proof.
-  iIntros (Hmask <- ? Φ) "[#guards [G [Hv £]]] HΦ".
-  iApply wp_lift_base_step; auto. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write _ _ _ (LitV $ LitInt zl) with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by trivial.
-  iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose". iSplit; first by eauto.
-  iNext; iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step.
-  - iMod "Hclose" as "_".
-    iMod (time_interp_step with "Ht") as "$". iModIntro.
-    rewrite insert_id => //.
-    iFrame "Hσ". iSplit; last done.
-    iApply wp_value.
-    iApply ("HΦ" with "[$Hv' $G]").
-  - rename select (lit_eq _ _ _) into Hfalse; inversion Hfalse; subst => //.
-Qed.
-
-Lemma wp_cas_int_fail E l z1 e2 lit2 zl :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) → z1 ≠ zl →
-  {{{ ▷ l ↦ LitV (LitInt zl) ∗ £1 }}}
-    CAS (Lit $ LitLoc l) (Lit $ LitInt z1) e2 @ E
-  {{{ RET LitV $ LitInt 0; l ↦ LitV (LitInt zl) }}}.
-Proof.
-  iIntros (Hmask IntoVal ? Φ) "[>pt £] ToΦ".
-  (* iMod lc_zero as "£0". *)
-  iApply (wp_cas_int_fail_guarded E l [] z1 e2 lit2 zl 0 True with "[pt £]"); trivial.
-  -  rewrite heap_cloc1_mapsto_val. iFrame. iApply guards_true.
-  - iNext. iIntros "[_ B]". iApply "ToΦ". rewrite heap_cloc1_mapsto_val. iFrame.
-Qed.
-
-Lemma wp_cas_suc_guarded  E l c lit1 e2 lit2 d G :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) → lit1 ≠ LitPoison →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ LitV lit1 ∗ £(3 * d + 1) }}}
-    CAS (Lit $ LitLoc l) (Lit lit1) e2 @ E
-  {{{ RET LitV $ LitInt 1; G ∗ (l,c) #↦ LitV lit2 }}}.
-Proof.
-  iIntros (Hmask <- ? Φ) "[#guards [G [Hv £]]] HΦ".
-  iApply wp_lift_base_step; auto. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write _ _ _ (LitV lit2) with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by trivial.
-  iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose". iSplit. 
-  { iPureIntro. eexists _, _, _, _. eapply CasSucS => //. destruct lit1 => //. }
-  iNext; iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step.
-  - rename select (lit_neq _ _) into Hfalse; inversion Hfalse; subst => //.
-  - iMod "Hclose" as "_".
-    iMod (time_interp_step with "Ht") as "$". iModIntro.
-    iFrame "Hσ". iSplit; last done.
-    iApply wp_value.
-    iApply ("HΦ" with "[$Hv' $G]").
-Qed.
-
-Lemma wp_cas_int_suc_guarded  E l c z1 e2 lit2 d G :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ LitV (LitInt z1) ∗ £(3 * d + 1) }}}
-    CAS (Lit $ LitLoc l) (Lit $ LitInt z1) e2 @ E
-  {{{ RET LitV $ LitInt 1; G ∗ (l,c) #↦ LitV lit2 }}}.
-Proof.
-  iIntros (Hmask <- Φ) "[#guards [G [Hv £]]] HΦ".
-  iApply (wp_cas_suc_guarded with "[$guards $G $Hv $£]") => //.
-Qed.
-
-Lemma wp_cas_suc E l lit1 e2 lit2 :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) → lit1 ≠ LitPoison →
-  {{{ ▷ l ↦ LitV lit1 ∗ £1 }}}
-    CAS (Lit $ LitLoc l) (Lit lit1) e2 @ E
-  {{{ RET LitV (LitInt 1); l ↦ LitV lit2 }}}.
-Proof.
-  iIntros (? <- ? Φ) "[>Hv £] HΦ".
-  iApply (wp_cas_suc_guarded E l [] lit1 _ lit2 0 True%I with "[Hv £]"); eauto => //.
-  -  rewrite heap_cloc1_mapsto_val. iFrame. iApply guards_true.
-  - iNext. iIntros "[_ B]". iApply "HΦ". rewrite heap_cloc1_mapsto_val. iFrame.
-Qed.
-
-Lemma wp_cas_int_suc E l z1 e2 lit2 :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) →
-  {{{ ▷ l ↦ LitV (LitInt z1) ∗ £1 }}}
-    CAS (Lit $ LitLoc l) (Lit $ LitInt z1) e2 @ E
-  {{{ RET LitV (LitInt 1); l ↦ LitV lit2 }}}.
-Proof.
-  iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
-  iApply (wp_cas_suc with "[$]") => //.
-Qed.
-
-Lemma wp_cas_loc_suc E l l1 e2 lit2 :
-  ↑naN ⊆ E →
-  IntoVal e2 (LitV lit2) →
-  {{{ ▷ l ↦ LitV (LitLoc l1) ∗ £1 }}}
-    CAS (Lit $ LitLoc l) (Lit $ LitLoc l1) e2 @ E
-  {{{ RET LitV (LitInt 1); l ↦ LitV lit2 }}}.
-Proof.
-  iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
-  iApply (wp_cas_suc with "[$]") => //.
 Qed.
 
 Lemma wp_eq_loc E (l1 : loc) (l2: loc) v1 v2 P Φ :

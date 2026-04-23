@@ -1,7 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From lrust.typing Require Export type function product programs bool own cont uninit pcell product_split borrow.
 From lrust.typing Require Export soundness.
-From lrust.lang Require Import races.
 From lrust.typing.examples Require Import assert.
 From lrust.lang Require Import lang notation.
 Set Default Proof Using "Type".
@@ -246,15 +245,15 @@ Section assert.
 End assert.
 
 (* Instantiate the type soundness theorem. This gives us the result that pcell_example
-   executes without getting stuck or producing any data races.
-   
+   executes without getting stuck.
+
    Note that the theorem is statement is independent of Iris, all typing rules, etc.
    It's just a statement about the operational behavior of pcell_example.
  *)
 Theorem pcell_example_executes_without_getting_stuck σ t :
   rtc erased_step ([pcell_example [exit_cont]%E], (∅, false)) (t, σ) →
-  nonracing_threadpool t σ ∧ (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
-Proof. 
+  (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
+Proof.
   apply (type_soundness_closed pcell_example σ t (pcell_example, ())).
   intros typeG0. apply pcell_example_type.
 Qed.

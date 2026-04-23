@@ -1,4 +1,4 @@
-From Coq.Program Require Import Tactics.
+From Stdlib.Program Require Import Tactics.
 From lrust.lang Require Export proofmode.
 
 (* Last, so that we make sure we shadow the defintion of delete for

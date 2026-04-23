@@ -1,7 +1,7 @@
 From iris.algebra Require Import frac dfrac_agree.
 From lrust.util Require Import cancellable_na_invariants.
 From iris.proofmode Require Import proofmode.
-From lrust.lang Require Import races adequacy proofmode notation.
+From lrust.lang Require Import adequacy proofmode notation.
 From lrust.lifetime Require Import lifetime_full.
 From guarding.lib Require Import fractional cancellable.
 From guarding Require Import guard.
@@ -37,13 +37,11 @@ Section type_soundness.
   Theorem type_soundness `{!typePreG Σ} (main : val) σ t c :
     (∀ `{!typeG Σ}, typed_val main main_type c) →
     rtc erased_step ([main [exit_cont]%E], (∅, false)) (t, σ) →
-    nonracing_threadpool t σ ∧
     (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
   Proof.
     intros Hmain Hrtc.
     cut (adequate NotStuck (main [exit_cont]%E) (∅, false) (λ _ _, True)).
-    { split. by eapply adequate_nonracing.
-      intros. by eapply (adequate_not_stuck _ (main [exit_cont]%E)). }
+    { intros. by eapply (adequate_not_stuck _ (main [exit_cont]%E)). }
     apply: lrust_adequacy=>?. iIntros "£ #TIME".
     iMod (llft_alloc with "£") as (?) "#LFT".
     iMod proph_init as (?) "#PROPH"; first done.
@@ -92,7 +90,6 @@ End type_soundness.
 Theorem type_soundness_closed (main : val) σ t c :
   (∀ `{!typeG typeΣ}, typed_val main main_type c) →
   rtc erased_step ([main [exit_cont]%E], (∅, false)) (t, σ) →
-  nonracing_threadpool t σ ∧
   (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
 Proof.
   intros. eapply @type_soundness; try done. apply _.

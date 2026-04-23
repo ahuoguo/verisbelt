@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - rocq/rocq-prover:9.1.1-ocaml-4.14.2-flambda
+      max-parallel: 4
+      # don't cancel all in-progress jobs if one matrix job fails:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: coq-community/docker-coq-action@v1
+        with:
+          opam_file: 'rocq-verusbelt.opam'
+          custom_image: ${{ matrix.image }}
+          install: |
+            startGroup "Configure opam repositories"
+              opam repo add --this-switch rocq-released https://rocq-prover.org/opam/released || true
+              opam repo add --this-switch iris-dev https://gitlab.mpi-sws.org/iris/opam.git || true
+              opam update -y
+            endGroup
+            startGroup "Install VerusBelt dependencies"
+              opam pin add -n -y -k path $PACKAGE $WORKDIR
+              opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only
+            endGroup
+          before_script: |
+            sudo chown -R 1000:1000 .  
+          script: |
+            startGroup Build
+              make -j2
+            endGroup
+          uninstall: |
+            make clean
+      - name: Revert permissions
+        # to avoid a warning at cleanup time
+        if: ${{ always() }}
+        run: sudo chown -R 1001:116 .

@@ -10,8 +10,6 @@ From iris.prelude Require Import options.
 From iris.base_logic.lib Require Export own iprop.
 From iris.proofmode Require Import base proofmode.
 From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 (* Leaf Lifetime Logic. Based loosely on RustBelt's lifetime logic. *)
@@ -246,7 +244,7 @@ Lemma consistent_modulo_for_alloc_bs sd mbs gs sn bs bs' :
 Proof.
   intros Hnone Hcon [Hfwd [Hrev Hunique]]. split.
   { intros sn0 bs'0 bs0. destruct (decide (sn = sn0)).
-    - subst sn0. intros Hsome. rewrite lookup_insert in Hsome. inversion Hsome. subst bs'0.
+    - subst sn0. intros Hsome. rewrite lookup_insert_eq in Hsome. inversion Hsome. subst bs'0.
       intros Hnotperm Hinm.
       assert ((sn, bs0) ∉ gs) as Hnotin. {
         intros Hin. have Hr := Hrev sn bs0 Hin Hnotperm. destruct Hr as [bsx [Ha Hb]].
@@ -257,7 +255,7 @@ Proof.
       rewrite gmultiset_elem_of_singleton in Hinm. inversion Hinm. subst bs0.
       split; trivial. rewrite multiplicity_disj_union.
       rewrite elem_of_multiplicity in Hnotin.
-      rewrite multiplicity_singleton. lia.
+      rewrite multiplicity_singleton_eq. lia.
     - intros Hsome Hnotperm Helem. rewrite lookup_insert_ne in Hsome; trivial.
       rewrite gmultiset_elem_of_disj_union in Helem. destruct Helem as [Helem|Helem].
       + rewrite gmultiset_elem_of_singleton in Helem. inversion Helem. subst sn0. contradiction.
@@ -270,7 +268,7 @@ Proof.
     intros sn0 bs0 Helem Hnotperm. rewrite gmultiset_elem_of_disj_union in Helem.
     destruct Helem as [Helem|Helem].
     - rewrite gmultiset_elem_of_singleton in Helem. inversion Helem. subst sn0. subst bs0.
-      exists bs'. split; trivial. rewrite lookup_insert. trivial.
+      exists bs'. split; trivial. rewrite lookup_insert_eq. trivial.
     - have Hr := Hrev sn0 bs0 Helem Hnotperm.
       destruct Hr as [bs0' [Hr Hcons]]. exists bs0'. rewrite lookup_insert_ne; intuition.
       subst sn0. rewrite Hnone in Hr. discriminate.
@@ -356,7 +354,7 @@ Lemma mult_union_1_contra (p : slice_name * BorState) (gs : gmultiset_bor_state)
   False.
 Proof.
   intros Hin Hmult.
-  rewrite multiplicity_disj_union in Hmult. rewrite multiplicity_singleton in Hmult.
+  rewrite multiplicity_disj_union in Hmult. rewrite multiplicity_singleton_eq in Hmult.
   assert ((0 < multiplicity p gs)) as X. { rewrite <- elem_of_multiplicity. trivial. }
   lia.
 Qed.
@@ -366,7 +364,7 @@ Lemma get_mult_singleton_union_1 (p : slice_name * BorState) (gs : gmultiset_bor
   multiplicity p ({[+ p +]} ⊎ gs) = 1.
 Proof.
   intros Hnotin.
-  rewrite multiplicity_disj_union. rewrite multiplicity_singleton.
+  rewrite multiplicity_disj_union. rewrite multiplicity_singleton_eq.
   assert (¬(0 < multiplicity p gs)) as X. { rewrite <- elem_of_multiplicity. trivial. }
   lia.
 Qed.
@@ -514,7 +512,7 @@ Proof.
       destruct (decide (sn = sn0)).
       - subst sn0.
         rewrite gmultiset_elem_of_disj_union in Helem. 
-        rewrite lookup_insert in Hsome. inversion Hsome. subst bs'0.
+        rewrite lookup_insert_eq in Hsome. inversion Hsome. subst bs'0.
         destruct (decide ((sn, bs0) ∈ gs)) as [Hin|Hout].
         {
           exfalso. apply (get_not_in sd mbs gs sn bs1 bs0); trivial.
@@ -549,7 +547,7 @@ Proof.
       assert ((sn, bs1) ∈ {[+ (sn, bs1) +]} ⊎ gs) as Helem2 by set_solver.
       have Hr := Hrev sn bs1 Helem2 Hnotperm1. destruct Hr as [bs' [Hgsn Hcons]].
       exists bs2. split; trivial.
-      + apply lookup_insert.
+      + apply lookup_insert_eq.
       + apply consistent_bs_refl.
     - destruct (decide (sn = sn0)).
        + exfalso. subst sn0. apply (get_not_in sd mbs gs sn bs1 bs); trivial.
@@ -641,7 +639,7 @@ Proof.
   destruct Hf as [Hcons2 Hmult].
   rewrite multiplicity_disj_union in Hmult.
   rewrite multiplicity_disj_union in Hmult.
-  rewrite multiplicity_singleton in Hmult. lia.
+  rewrite multiplicity_singleton_eq in Hmult. lia.
 Qed.
 
 Definition lt_inv (a: LtRa) := match a with
@@ -1242,7 +1240,7 @@ Section LlftHelperResources.
             rewrite multiplicity_disj_union.
             rewrite multiplicity_disj_union.
             rewrite elem_of_singleton in m_k. rewrite m_k.
-            rewrite multiplicity_singleton.
+            rewrite multiplicity_singleton_eq.
             have fmk := fm k. destruct fmk as [_ fmk0].
             rewrite gmultiset_disj_union_left_id in fmk0.
             rewrite fmk0; trivial.
@@ -1295,7 +1293,7 @@ Section LlftHelperResources.
         exfalso.
         destruct fmk as [_ fmk]. have fmk1 := fmk n. subst a.
         rewrite multiplicity_disj_union in fmk1.
-        rewrite multiplicity_singleton in fmk1. lia.
+        rewrite multiplicity_singleton_eq in fmk1. lia.
     - inversion lts.
     - inversion lts.
   Qed.
@@ -1382,11 +1380,11 @@ Section LlftHelperResources.
         rewrite multiplicity_disj_union in Hm.
         rewrite multiplicity_disj_union in Hm.
         rewrite multiplicity_disj_union in Hm.
-        rewrite multiplicity_singleton in Hm. lia.
+        rewrite multiplicity_singleton_eq in Hm. lia.
       + have Hm := Hm2 e.
         rewrite multiplicity_disj_union in Hm.
         rewrite multiplicity_disj_union in Hm.
-        rewrite multiplicity_singleton in Hm. lia.
+        rewrite multiplicity_singleton_eq in Hm. lia.
     - unfold lt_inv in Hv. contradiction.
     - unfold lt_inv in Hv. contradiction.
     - unfold lt_inv in Hv. contradiction.
@@ -1435,7 +1433,7 @@ Section LlftHelperResources.
             * exfalso. apply m_not_in_sa. apply h.
             * rewrite multiplicity_disj_union in fmm1.
               have fmm1i := fmm1 h.
-              rewrite elem_of_singleton in mk. subst m. rewrite multiplicity_singleton in fmm1i.
+              rewrite elem_of_singleton in mk. subst m. rewrite multiplicity_singleton_eq in fmm1i.
                 rewrite multiplicity_empty in fmm1i. lia.
           + have fmm2i := fmm2 n.
             rewrite multiplicity_disj_union in fmm2i.
@@ -1490,7 +1488,7 @@ Section LlftHelperResources.
       rewrite multiplicity_disj_union.
       rewrite elem_of_union in is_in. destruct is_in as [ix|ib].
       + rewrite elem_of_singleton in ix. subst x. rewrite mult_list_to_set_disj_not_in; trivial.
-          rewrite multiplicity_singleton. trivial.
+          rewrite multiplicity_singleton_eq. trivial.
       + rewrite (IH ib). rewrite multiplicity_singleton_ne; trivial. intro x_eq_y.
           subst x. contradiction.
   Qed.

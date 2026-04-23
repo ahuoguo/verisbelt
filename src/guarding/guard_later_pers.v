@@ -1,7 +1,7 @@
 From iris.algebra Require Export cmra.
 From iris.base_logic Require Import upred.
 From iris.base_logic.lib Require Export own iprop wsat invariants.
-From iris.proofmode Require Export tactics.
+From iris.proofmode Require Export proofmode.
 Require Import guarding.guard.
 
 (** Say you have [P &&{E}&&> (▷ Q)] and you want to eliminate the [▷].

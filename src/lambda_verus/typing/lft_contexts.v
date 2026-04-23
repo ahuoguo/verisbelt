@@ -250,7 +250,7 @@ Section lft_contexts.
     iDestruct (H2 with "HL HE") as "#Alv".
     iAssert (llctx_interp L &&{↑NllftG}&&> llctx_elt_interp (κ ⊑ₗ κs))%I with "[HL]" as "#HL1". {
         unfold llctx_interp. leaf_by_sep. iIntros "A".
-        destruct (elem_of_list_lookup_1 _ _ Hin) as [i Hso].
+        destruct (list_elem_of_lookup_1 _ _ Hin) as [i Hso].
         iDestruct (big_sepL_lookup_acc with "A") as "J".
         -  apply Hso.
         -  iFrame "J".

@@ -303,7 +303,7 @@ Section spawn.
       + iIntros (r).
         simpl_subst.
         iApply (@cont.type_jump _ _ [at_locₛ (at_locₛ (join_handleₛ ℭ))] [at_locₛ (at_locₛ (join_handleₛ ℭ))] [] (at_locₛ (at_locₛ (join_handleₛ ℭ))) _ _ _ _ _ _ (λ post '(l -:: _) mask π, post -[l] mask π) _ _ _ _ _ +[]).
-        * by apply elem_of_list_singleton. 
+        * by apply list_elem_of_singleton. 
         * eapply tctx_extract_ctx_eq.
           { eapply tctx_extract_ctx_elt.
             1: apply tctx_extract_elt_here_exact.

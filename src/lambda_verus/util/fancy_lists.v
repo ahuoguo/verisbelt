@@ -588,7 +588,7 @@ Proof.
   - apply _.
   - rewrite /dist /hlist_dist. 
     intros H Hlt. eapply HForallTwo_impl; last by apply H. intros.
-    eapply dist_le. apply H0. lia.
+    eapply dist_le. apply H0. apply Hlt.
 Qed.
 
 Canonical Structure hlistO := Ofe (hlist F Xl) hlist_ofe_mixin.

@@ -168,7 +168,7 @@ Section typing.
           iSplit; iIntros "#H"; (iApply llftl_incl_trans; [iApply "H"|done]).
         + unfold uniq_body. do 2 f_equiv.
           * do 3 f_equiv. apply idx_bor_contractive.
-            destruct n. { split. lia. } apply dist_later_S.
+            destruct n. { apply dist_later_0. } apply dist_later_S.
             do 9 f_equiv.
             -- rewrite dist_later_S. done.
             -- f_equiv. apply Heq5.
@@ -177,7 +177,7 @@ Section typing.
        destruct x as [[[[[l x0] ξi] d'] g'] idx]. simpl. do 2 f_equiv.
         + f_equiv. apply later_contractive. apply Heq4.
         + unfold uniq_body_pers_component. apply idx_bor_contractive.
-            destruct n. { split. lia. } apply dist_later_S.
+            destruct n. { apply dist_later_0. } apply dist_later_S.
             do 9 f_equiv.
             -- rewrite dist_later_S. done.
             -- f_equiv. apply Heq5.

@@ -5,10 +5,7 @@ From iris.algebra Require Import auth.
 
 From iris.base_logic Require Import upred.
 From iris.base_logic.lib Require Export own iprop.
-From iris.proofmode Require Import base.
-From iris.proofmode Require Import ltac_tactics.
-From iris.proofmode Require Import tactics.
-From iris.proofmode Require Import coq_tactics.
+From iris.proofmode Require Import base proofmode.
 
 Require Import guarding.own_and.
 
@@ -17,42 +14,28 @@ Section AuthFragUtil.
 Context {C : ucmra}.
 Context {Σ: gFunctors}.
 Context {m: inG Σ (authUR C)}.
-Context `{Disc : CmraDiscrete C}.
+Context {Disc : CmraDiscrete (ucmra_cmraR C)}.
 
 Lemma auth_op_rhs_is_frag (p: C) z (val : ✓ (● p ⋅ z)) : ∃ q , z = ◯ q.
 Proof.
-  destruct z as [a f]. exists f.
-  unfold "◯", "◯V". f_equal.
-  destruct a as [p0|]; trivial.
-  exfalso.
-  unfold "●", "●V" in val.
-  
-  assert (
-    @valid (@view C C (@auth_view_rel_raw C)) (view_valid_instance _)
-        (@op _ (view_op_instance _)
-          (View (Some (DfracOwn 1, to_agree p)) ε)
-          (View (Some p0) f)
-        )
-  ) as val2.
-    { trivial. }
-  
-  rewrite /op /view_op_instance /view_auth_proj /view_frag_proj in val2.
-  rewrite /valid /view_valid_instance /view_auth_proj in val2.
-  destruct p0 as [d a].
-  assert (Some (DfracOwn 1, to_agree p) ⋅ Some (d, a)
-      = Some (DfracOwn 1 ⋅ d, to_agree p ⋅ a)) as Q.
-    { trivial. }
-  rewrite Q in val2.
-  destruct val2 as [val_frac _].
-  have k := dfrac_valid_own_l _ _ val_frac.
-  assert (1 ≤ 1)%Qp as k1. { trivial. }
-  generalize k1.
-  rewrite Qp.le_ngt. intro h. apply h. trivial.
+  destruct z as [z_auth z_frag]. destruct z_auth as [[dq a]|]; last first.
+  { exists z_frag. reflexivity. }
+  exfalso. rewrite cmra_valid_validN in val. specialize (val 0).
+  pose proof val as val'. apply cmra_validN_op_r in val'.
+  pose proof val as val''. apply cmra_validN_op_l in val''.
+  rewrite view_auth_dfrac_validN in val''. destruct val'' as [Hdq1 _].
+  destruct val' as [Hdq2 [a0 [Hag _]]].
+  assert (View (Some (dq, a)) z_frag ≡{0}≡ (●V{dq} a0 ⋅ ◯V z_frag : auth C)) as Heq.
+  { unfold "●V", "◯V". constructor; simpl;
+      [by rewrite right_id; rewrite Hag | by rewrite left_id]. }
+  rewrite Heq in val. rewrite assoc in val. apply cmra_validN_op_l in val.
+  apply auth_auth_dfrac_op_validN in val. destruct val as [Hq _].
+  by apply dfrac_valid_own_l, Qp.lt_strict in Hq.
 Qed.
 
 Lemma view_op_rw (x w : option (dfrac * agree C)) (y z : C)
-    : @op (@view C C (@auth_view_rel_raw C)) (view_op_instance _)
-        (View x y) (View w z) = View (x ⋅ w) (y ⋅ z).
+    : (View (rel:=@auth_view_rel_raw _ C) x y) ⋅ (View w z)
+      = View (x ⋅ w) (y ⋅ z).
 Proof. trivial. Qed.
 
 Lemma rhs_has_auth (x y : C) (q1 q2: auth C)
@@ -221,7 +204,7 @@ Proof using C Disc m Σ.
   iPureIntro. split; trivial.
 Qed.
 
-Lemma auth_frag_incl (x y : C) (z: @viewUR _ C auth_view_rel) :
+Lemma auth_frag_incl (x y : C) (z: authUR C) :
   ● x ≼ z →
   ◯ y ≼ z →
   ✓ z →
@@ -270,11 +253,11 @@ Proof.
   unfold "●", "●V" in eq1.
   unfold "◯", "◯V".
   
-  replace (@View C C (@auth_view_rel C) None q ⋅ @View C C (@auth_view_rel C) g f)
-    with (@View C C (@auth_view_rel C) (None ⋅ g) (q ⋅ f)) in eq1 by trivial.
+  replace (@View _ C C (@auth_view_rel _ C) None q ⋅ @View _ C C (@auth_view_rel _ C) g f)
+    with (@View _ C C (@auth_view_rel _ C) (None ⋅ g) (q ⋅ f)) in eq1 by trivial.
     
-  replace (@View C C (@auth_view_rel C) (Some (DfracOwn 1, to_agree r)) ε ⋅ @View C C (@auth_view_rel C) g0 f0)
-    with (@View C C (@auth_view_rel C) (Some (DfracOwn 1, to_agree r) ⋅ g0) (ε ⋅ f0)) in eq1 by trivial.
+  replace (@View _ C C (@auth_view_rel _ C) (Some (DfracOwn 1, to_agree r)) ε ⋅ @View _ C C (@auth_view_rel _ C) g0 f0)
+    with (@View _ C C (@auth_view_rel _ C) (Some (DfracOwn 1, to_agree r) ⋅ g0) (ε ⋅ f0)) in eq1 by trivial.
     
   inversion eq1 as [Q R].
   unfold view_frag_proj in R.
@@ -283,8 +266,8 @@ Proof.
   intro X.
   
   exists (View g0 f).
-  replace (@View C C (@auth_view_rel C) None q ⋅ View g0 f) with
-          (@View C C (@auth_view_rel C) (None ⋅ g0) (q ⋅ f)) by trivial.
+  replace (@View _ C C (@auth_view_rel _ C) None q ⋅ View g0 f) with
+          (@View _ C C (@auth_view_rel _ C) (None ⋅ g0) (q ⋅ f)) by trivial.
   
   f_equiv.
   { rewrite op_None_left_id. trivial. }

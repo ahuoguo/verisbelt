@@ -115,7 +115,7 @@ Lemma next_access_head_Na1Ord_concurent_step e1 e1' e2 e'f σ σ' κ a1 a2 l :
   next_access_head e2 σ' a2 l.
 Proof.
   intros Ha1 Hstep Ha2. inversion Ha1; subst; clear Ha1; inv_head_step;
-  destruct Ha2; simplify_eq; econstructor; eauto; try apply lookup_insert.
+  destruct Ha2; simplify_eq; econstructor; eauto; try apply lookup_insert_eq.
   (* Oh my. FIXME. *)
   - eapply lit_eq_state; last done.
     setoid_rewrite <-(not_elem_of_dom (D:=gset loc)). rewrite dom_insert_L.
@@ -136,7 +136,7 @@ Proof.
     replace n with (Z.of_nat (Z.to_nat n)) in Hi by (apply Z2Nat.id; lia).
     revert l i Hi. induction (Z.to_nat n) as [|? IH]=>/=l i Hi. lia.
     destruct (decide (i = 0)).
-    - subst. by rewrite /shift_loc Z.add_0_r -surjective_pairing lookup_delete.
+    - subst. by rewrite /shift_loc Z.add_0_r -surjective_pairing lookup_delete_eq.
     - replace i with (1+(i-1)) by lia.
       rewrite lookup_delete_ne -shift_loc_assoc ?IH //. lia.
       destruct l; intros [= ?]. lia. }
@@ -155,7 +155,7 @@ Proof.
   intros Hsafe Hi Hstep κ1 e1 σ1 ? Hstep1 Hstuck.
   cut (reducible (fill K e1) σ1).
   { subst. intros (?&?&?&?&?). by eapply stuck_irreducible. }
-  destruct (elem_of_list_split _ _ Hi) as (?&?&->).
+  destruct (list_elem_of_split _ _ Hi) as (?&?&->).
   eapply Hsafe; last by (apply: fill_not_val; subst).
   - eapply rtc_l, rtc_l, rtc_refl.
     + eexists. econstructor. done. done. econstructor; done.
@@ -172,7 +172,7 @@ Proof.
   intros Hsafe Hi κ e1 σ1 ? Hstep1 Hstuck.
   cut (reducible (fill K e1) σ1).
   { subst. intros (?&?&?&?&?). by eapply stuck_irreducible. }
-  destruct (elem_of_list_split _ _ Hi) as (?&?&->).
+  destruct (list_elem_of_split _ _ Hi) as (?&?&->).
   eapply Hsafe; last by (apply: fill_not_val; subst).
   - eapply rtc_l, rtc_refl.
     + eexists. econstructor. done. done. econstructor; done.
@@ -283,7 +283,7 @@ Proof.
   destruct Hrede1_2 as (κ2'&e2'&σ'&ef&?).
   inv_head_step.
   (*match goal with
-  | H : <[l:=_]> σ.1 !! l = _ |- _ => by rewrite lookup_insert in H
+  | H : <[l:=_]> σ.1 !! l = _ |- _ => by rewrite lookup_insert_eq in H
   end.*)
 Qed.
 

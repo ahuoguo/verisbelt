@@ -3,7 +3,7 @@ From iris.algebra Require Import gmap auth.
 From iris.base_logic Require Import upred.
 From iris.base_logic.lib Require Export own iprop wsat invariants.
 From iris.base_logic.lib Require Import fancy_updates fancy_updates_from_vs.
-From iris.proofmode Require Export tactics.
+From iris.proofmode Require Export proofmode.
 Require Import guarding.factoring_props.
 
 Section Guard.
@@ -48,7 +48,7 @@ Proof.
   - apply big_sepM_singleton.
   - apply map_eq. intros i0.
       have h : Decision (i = i0) by solve_decision. destruct h.
-      + subst i0. rewrite lookup_singleton.
+      + subst i0. rewrite lookup_singleton_eq.
         rewrite lookup_gset_to_gmap. unfold guard.
             destruct (decide (i ∈ {[i]})) as [e|e]; trivial.
             rewrite elem_of_singleton in e. contradiction.
@@ -66,7 +66,7 @@ Proof.
   - apply big_sepM_singleton.
   - apply map_eq. intros i0.
       have h : Decision (i = i0) by solve_decision. destruct h.
-      + subst i0. rewrite lookup_singleton.
+      + subst i0. rewrite lookup_singleton_eq.
       rewrite lookup_gset_to_gmap. unfold guard.
             destruct (decide (i ∈ {[i]})) as [e|e]; trivial.
             rewrite elem_of_singleton in e. contradiction.
@@ -627,7 +627,7 @@ Proof.
   iDestruct (own_valid with "x") as "v".
   rewrite gmap_view_frag_op_validI.
   iDestruct "v" as "[#v iu]".
-  rewrite agree_validI.
+  rewrite agree_op_invI.
   rewrite agree_equivI.
   unfold invariant_unfold.
   iDestruct (later_equivI_1 with "iu") as "iu".

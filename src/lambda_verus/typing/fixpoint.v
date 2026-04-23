@@ -55,15 +55,15 @@ Section S.
         * apply type_contractive_ty_size.
         * apply (Tn_ty_lft_const (S i) 1).
         * apply (Tn_ty_E_const i 0).
-        * split. lia.
-        * split. lia.
+        * intros; apply dist_later_0.
+        * intros; apply dist_later_0.
         * intros. do 2 (rewrite <- ty_phys_eq2). trivial.
       + apply HT=>//.
         * apply type_contractive_ty_size.
         * apply (Tn_ty_lft_const (S i) 1).
         * apply (Tn_ty_E_const i 0).
-        * split. lia.
-        * split. lia.
+        * intros; apply dist_later_0.
+        * intros; apply dist_later_0.
         * intros. do 2 (rewrite <- ty_phys_eq2). trivial.
     - case i as [|]; [lia|]. case (IH i) as [??]; [lia|].
       split.
@@ -96,8 +96,8 @@ Section S.
         * apply type_contractive_ty_size.
         * apply (Tn_ty_lft_const (S i) 1).
         * apply (Tn_ty_E_const i 0).
-        * split. lia.
-        * split. lia.
+        * intros; apply dist_later_0.
+        * intros; apply dist_later_0.
         * intros. do 2 (rewrite <- ty_phys_eq2). trivial.
     - case i as [|]; [lia|]. case (IH i) as [??]; [lia|].
       split.
@@ -128,8 +128,9 @@ Section S.
           ((~~𝔄) -d> nat -d> nat -d> thread_id -d> iPropO Σ) |}.
   Next Obligation.
     move=> n i Hni. split=>/=.
-    - move=> >. apply (dist_le (S n)); last by lia. apply (Tn_cauchy (S _)). lia.
-    - move=> >. apply dist_S, Tn_cauchy. lia.
+    - move=> >. apply (dist_le (S n)); last by apply SIdx.le_succ_diag_r.
+      apply (Tn_cauchy (S _)). apply -> SIdx.succ_le_mono. exact Hni.
+    - move=> >. apply dist_S, Tn_cauchy. apply -> SIdx.succ_le_mono. exact Hni.
   Qed.
 
   Program Definition Tn' n : type 𝔄 := {|
@@ -160,26 +161,26 @@ Section S.
   Next Obligation. intros. apply ty_size_eq2. Qed.
   Next Obligation. intros. apply ty_phys_eq2. Qed.
   Next Obligation.
-    move=> *. apply @limit_preserving; [|move=> ?; by apply ty_gho_depth_mono].
+    move=> *. apply @limit_preserving_compl; [|move=> ?; by apply ty_gho_depth_mono].
     apply limit_preserving_entails=> ??? Eq. { done. } f_equiv. { apply Eq. }
     f_equiv. { apply Eq. } f_equiv; apply Eq.
   Qed.
   Next Obligation.
-    move=> *. apply @limit_preserving; [|move=> ?; by apply ty_gho_pers_depth_mono].
+    move=> *. apply @limit_preserving_compl; [|move=> ?; by apply ty_gho_pers_depth_mono].
     apply limit_preserving_entails=> ??? Eq. { done. } f_equiv; apply Eq.
   Qed.
   Next Obligation.
-    move=> *. apply @limit_preserving; [|move=> ?; by apply (ty_guard_proph _ (Tn' _))].
+    move=> *. apply @limit_preserving_compl; [|move=> ?; by apply (ty_guard_proph _ (Tn' _))].
     apply limit_preserving_entails; [done|]=> ??? Eq.
     do 3 f_equiv. { apply Eq. }
     do 4 f_equiv. { apply Eq. }
   Qed.
   Next Obligation.
-    move=> *. apply @limit_preserving, _.
+    move=> *. apply @limit_preserving_compl, _.
     apply limit_preserving_Persistent=> ??? Eq. apply Eq.
   Qed.
   Next Obligation.
-    move=> *. apply @limit_preserving; [|move=> ?; by apply ty_gho_pers_impl].
+    move=> *. apply @limit_preserving_compl; [|move=> ?; by apply ty_gho_pers_impl].
     apply limit_preserving_entails; [done|]=> ??? Eq.
     f_equiv; apply Eq.
   Qed.
@@ -319,10 +320,10 @@ Section fix_ty.
   Proof.
     move=> ?. have ?: ∀n, Copy (Tn T n) by elim; apply _.
     split; rewrite /fix_ty /=.
-    - move=> >. eapply @limit_preserving; [|apply _].
+    - move=> >. eapply @limit_preserving_compl; [|apply _].
       apply limit_preserving_Persistent=> ??? Eq. apply Eq.
     - move=> >. 
-      eapply @limit_preserving.
+      eapply @limit_preserving_compl.
       + apply limit_preserving_entails=> ??? Eq.
         * apply Eq.
         * done.
@@ -335,7 +336,7 @@ Section fix_ty.
   Proof.
     move=> ?. have ?: ∀n, Send (Tn T n) by elim; apply _. split; rewrite /fix_ty=> > /=.
     { do 2 (rewrite <- ty_phys_eq2). apply syn_abstract_phys_eq. }
-    eapply @limit_preserving.
+    eapply @limit_preserving_compl.
     + apply limit_preserving_forall. intro.
       apply limit_preserving_forall. intro.
       apply limit_preserving_forall. intro.
@@ -348,15 +349,18 @@ Section fix_ty.
   Global Instance fix_sync :
     (∀`(!Sync ty), Sync (T ty)) → Sync (fix_ty T).
   Proof.
-    move=> ?. have ?: ∀n, Sync (Tn T n) by elim; apply _. rewrite /fix_ty=> > /=.
-    eapply @limit_preserving.
-      + apply limit_preserving_and; [|apply limit_preserving_and].
-        * do 2 (rewrite <- ty_phys_eq2). done.
-        * apply limit_preserving_equiv=> ??? Eq; apply Eq.
-        * apply limit_preserving_equiv=> ??? Eq; apply Eq.
-      + intros. split.
-        * do 2 (rewrite <- ty_phys_eq2). done.
-        * apply sync_change_tid.
+    intros HS. have ?: ∀n, Sync (Tn T n) by elim; apply _. rewrite /fix_ty.
+    intros tid1 tid2 xa d g. simpl.
+    split. { do 2 (rewrite <- ty_phys_eq2). done. }
+    split.
+    - eapply (limit_preserving_compl (P := λ ch : _ -d> _ -d> _ -d> _ -d> iPropO Σ, ch xa d g tid1 ⊣⊢ ch xa d g tid2)).
+      intros n. simpl. apply sync_change_tid.
+      Unshelve. eapply @limit_preserving_equiv; try typeclasses eauto.
+      all: intros ??? Eq; apply Eq.
+    - eapply (limit_preserving_compl (P := λ ch : _ -d> _ -d> _ -d> _ -d> iPropO Σ, ch xa d g tid1 ⊣⊢ ch xa d g tid2)).
+      intros n. simpl. apply sync_change_tid.
+      Unshelve. eapply @limit_preserving_equiv; try typeclasses eauto.
+      all: intros ??? Eq; apply Eq.
   Qed.
 
   Lemma fix_resolve E L Φ :
@@ -364,7 +368,7 @@ Section fix_ty.
   Proof.
     move=> Loop. have Rslv: ∀n, resolve E L (Tn T n) Φ.
     { elim=> [|? H]; apply Loop; [apply base_resolve|apply H]. }
-    rewrite /fix_ty=> > /=. eapply @limit_preserving; [|move=> ?; apply Rslv].
+    rewrite /fix_ty=> > /=. eapply @limit_preserving_compl; [|move=> ?; apply Rslv].
     apply limit_preserving_forall=> ?. 2: { done. }
     apply limit_preserving_entails; [done|]=> ??? Eq. do 8 f_equiv. apply Eq.
   Qed.

@@ -1,7 +1,7 @@
 Require Import guarding.internal.na_invariants_fork.
 From lrust.util Require Import non_atomic_cell_map atomic_lock_counter.
 From guarding Require Import guard.
-From Coq.Arith Require Import PeanoNat.
+From Stdlib Require Import PeanoNat.
 From stdpp Require Import coPset.
 From iris.algebra Require Import big_op gmap frac agree numbers.
 From iris.algebra Require Import csum excl auth cmra_big_op.
@@ -1309,8 +1309,8 @@ Section heap.
       (l, cs) #↦!∗ fvl ⊢ inl (l +ₗ i) @↦[heap_name] cv.
   Proof.
     move => Hlookup1 Hlookup2.
-    apply elem_of_list_split_length in Hlookup1 as [cs1 [cs2 [-> Hi]]].
-    apply elem_of_list_split_length in Hlookup2 as [fvl1 [fvl2 [-> Hi']]].
+    apply list_elem_of_split_length in Hlookup1 as [cs1 [cs2 [-> Hi]]].
+    apply list_elem_of_split_length in Hlookup2 as [fvl1 [fvl2 [-> Hi']]].
     rewrite heap_cloc_mapsto_fancy_vec_app.
     rewrite -Hi' Hi cloc_take_app_length cloc_skip_app_length.
     rewrite {1} heap_mapsto_cloc_fancy_vec_cons.
@@ -1326,8 +1326,8 @@ Section heap.
       (l, cs) #↦!∗ fvl ⊢ inr cell @↦[heap_name] cv.
   Proof.
     move => Hlookup1 Hlookup2.
-    apply elem_of_list_split_length in Hlookup1 as [cs1 [cs2 [-> Hi]]].
-    apply elem_of_list_split_length in Hlookup2 as [fvl1 [fvl2 [-> Hi']]].
+    apply list_elem_of_split_length in Hlookup1 as [cs1 [cs2 [-> Hi]]].
+    apply list_elem_of_split_length in Hlookup2 as [fvl1 [fvl2 [-> Hi']]].
     rewrite heap_cloc_mapsto_fancy_vec_app.
     rewrite -Hi' Hi cloc_take_app_length cloc_skip_app_length.
     rewrite {1} heap_mapsto_cloc_fancy_vec_cons.
@@ -1342,7 +1342,7 @@ Section heap.
       (l, cs) #↦∗_ ⊢ inl (l +ₗ i) @↦[heap_name][^cells] (inl cell).
   Proof.
     move => Hlookup.
-    apply elem_of_list_split_length in Hlookup as [cs1 [cs2 [-> Hi]]].
+    apply list_elem_of_split_length in Hlookup as [cs1 [cs2 [-> Hi]]].
     rewrite (heap_cloc_mapsto_emp_vec_app _ i).
     rewrite Hi cloc_take_app_length cloc_skip_app_length.
     rewrite heap_mapsto_cloc_emp_cons.
@@ -1377,8 +1377,9 @@ Section heap.
        - iApply (cloc_get_row_no_cells _ _ _ _ _ Hc Hv with "[And]").
          iDestruct "And" as "[_ $]".
        - have Hsplit := split_at_last_eq_concat_last c cells.
-         destruct (split_at_last (c :: cells)) as [[prefix last_cell]|] eqn:Hsp; last by done.
-         rewrite Hsplit. iApply pt_seq_cons_back_and. iSplit.
+         destruct (split_at_last (c :: cells)) as [[prefix last_cell]|] eqn:Hsp;
+            last by (rewrite Hsp in Hsplit; contradiction).
+         rewrite Hsp in Hsplit. rewrite Hsplit. iApply pt_seq_cons_back_and. iSplit.
           + iApply cloc_get_row_prefix. { rewrite <- Hsplit. apply Hc. }
             iDestruct "And" as "[$ _]".
           + iApply (cloc_get_row_last_cell l cs fvl i prefix last_cell).
@@ -1444,8 +1445,8 @@ Section heap.
         destruct Hc as (γ & cells' & ? & ? & ?).
         eexists; split => //.
         eexists; split => //. }
-      apply elem_of_list_split_length in Hcs as [cs1 [cs2 [Hcs Hcs1]]].
-      apply elem_of_list_split_length in Hγs as [γs1 [γs2 [Hγs Hγs1]]].
+      apply list_elem_of_split_length in Hcs as [cs1 [cs2 [Hcs Hcs1]]].
+      apply list_elem_of_split_length in Hγs as [γs1 [γs2 [Hγs Hγs1]]].
       rewrite Hcs Hγs.
       set cl := (l, cs1 ++ cells' :: cs2).
       change l with cl.1.
@@ -1456,17 +1457,17 @@ Section heap.
       replace (drop (length (FCell <$> γs1)) (cs1 ++ cells' :: cs2)) with (cells' :: cs2).
       2: {
         rewrite drop_app_length' => //.
-        rewrite length_fmap; lia.
+        rewrite length_fmap. rewrite -Hγs1 -Hcs1. reflexivity.
       }
       replace (take (length (FCell <$> γs1)) (cs1 ++ cells' :: cs2)) with cs1.
       2: {
         rewrite take_app_length' => //.
-        rewrite length_fmap; lia.
+        rewrite length_fmap. rewrite -Hγs1 -Hcs1. reflexivity.
       }
       rewrite heap_mapsto_cells_fancy_vec_cons.
       iDestruct (and_mono_l with "And") as "And".
       { iIntros "[H1 [H2 H3]]". iExact "H2". }
-      apply elem_of_list_split_length in Hv as [vl1 [vl2 [Hvl Hvl1]]].
+      apply list_elem_of_split_length in Hv as [vl1 [vl2 [Hvl Hvl1]]].
       rewrite Hvl.
       rewrite heap_cloc_mapsto_fancy_vec_app.
       rewrite -Hvl1 Hγs1.

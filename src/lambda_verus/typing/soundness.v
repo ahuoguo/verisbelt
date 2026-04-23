@@ -47,16 +47,15 @@ Section type_soundness.
     apply: lrust_adequacy=>?. iIntros "£ #TIME".
     iMod (llft_alloc with "£") as (?) "#LFT".
     iMod proph_init as (?) "#PROPH"; first done.
-    iMod uniq_init as (?) "#UNIQ"; first done. set (Htype := TypeG Σ _ _ _ _ _ _ _).
-    iMod (invctx_alloc ⊤) as (tid) "Hinvctx".
-    Set Printing Implicit.
+    iMod uniq_init as (Huniq) "#UNIQ"; first done. set (Htype := TypeG Σ _ _ _ _ _ _ _).
+    iMod (@invctx_alloc Σ _ _ _ (@type_cnaInv_logicΣ Σ (uniq_inG (uniqG := Huniq))) ⊤) as (tid) "Hinvctx".
     wp_bind (of_val main). iApply (wp_wand with "[Hinvctx]").
     iApply (Hmain Htype [] [] (InvCtx [] static AtomicClosed)
         tid (λ xl mask π, True) ⊤ [] -[]
       with "LFT TIME PROPH UNIQ [] [] [Hinvctx] [$]").
     { by rewrite /elctx_interp. }
     { by rewrite /llctx_interp big_sepL_nil. }
-    { iFrame "Hinvctx". }
+    { iApply "Hinvctx". }
     { by iApply proph_obs_true. }
     clear Hrtc Hmain main. iIntros (main) "Hmain".
     iDestruct "Hmain" as ([[fxval fx] []]) "/= (Htl & Invctx & [Hmain _] & #Obs)".

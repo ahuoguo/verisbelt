@@ -210,7 +210,7 @@ Section proofs.
   Lemma na_own_union p E1 E2 :
     E1 ## E2 → na_own p (E1 ∪ E2) ⊣⊢ na_own p E1 ∗ na_own p E2.
   Proof.
-    intros ?. by rewrite /na_own -own_op -pair_op left_id coPset_disj_union.
+    intros ?. rewrite /na_own -own_op -pair_op. rewrite coPset_disj_union //.
   Qed.
   
   Lemma na_own_union2 p E1 E2 :

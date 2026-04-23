@@ -20,7 +20,7 @@ Ltac solve_typing :=
   (typeclasses eauto with lrust_typing typeclass_instances core; fail) ||
   (typeclasses eauto with lrust_typing lrust_typing_merge typeclass_instances core; fail).
 
-Global Hint Constructors Forall Forall2 elem_of_list : lrust_typing.
+Global Hint Constructors Forall Forall2 list_elem_of : lrust_typing.
 Global Hint Resolve submseteq_cons submseteq_inserts_l submseteq_inserts_r
   : lrust_typing.
 

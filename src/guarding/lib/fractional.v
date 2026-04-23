@@ -1,15 +1,13 @@
-Require Import Coq.QArith.QArith_base.
-Require Import Coq.QArith.Qround.
-Require Import Coq.QArith.Qcanon.
-Require Import Coq.ZArith.Int.
+Require Import Stdlib.QArith.QArith_base.
+Require Import Stdlib.QArith.Qround.
+Require Import Stdlib.QArith.Qcanon.
+Require Import Stdlib.ZArith.Int.
 
 From iris.base_logic.lib Require Import invariants.
 
 From iris.base_logic Require Export base_logic.
-From iris.proofmode Require Import base.
-From iris.proofmode Require Import ltac_tactics.
-From iris.proofmode Require Import tactics.
-From iris.proofmode Require Import coq_tactics.
+From iris.proofmode Require Import base proofmode.
+From iris.proofmode Require Import proofmode.
 From iris Require Import options.
 
 Require Import guarding.guard.
@@ -370,7 +368,7 @@ Section Frac.
     : sto_frac γ R ⊢ R ={{[γ]}}=∗ own_frac γ 1.
   Proof.
     iIntros "#m q".
-    iDestruct (sp_deposit None (Some (1%Qp)) 1 _ _ with "m [q]") as "x".
+    iDestruct (sp_deposit (sp_i := frac_sp_inG) None (Some (1%Qp)) 1 _ _ with "m [q]") as "x".
     { rewrite eq_storage_protocol_deposit_ii. intros q Y. split.
       { unfold sp_inv, frac_inv in *. destruct q.
         { unfold "⋅", option_op, "⋅", frac_op_instance in *. apply is_int_plus_1. trivial. }
@@ -402,7 +400,7 @@ Section Frac.
     sto_frac γ R ⊢ own_frac γ 1 ={{[γ]}}=∗ ▷ R.
   Proof.
     iIntros "#m q".
-    iDestruct (sp_withdraw (Some (1%Qp)) None 1 _ _ with "m [q]") as "x".
+    iDestruct (sp_withdraw (sp_i := frac_sp_inG) (Some (1%Qp)) None 1 _ _ with "m [q]") as "x".
     { rewrite eq_storage_protocol_withdraw_ii. intros q Y. split.
       { unfold sp_inv, frac_inv in *. destruct q.
         { unfold "⋅", option_op, "⋅", frac_op_instance in *. apply is_int_minus_1. trivial. }

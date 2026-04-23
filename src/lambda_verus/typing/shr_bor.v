@@ -82,7 +82,7 @@ Section typing.
       + apply guards_contractive_right_if_n_ge_1; first by lia. trivial.
       + replace (g + 1) with (S g); last by lia. 
         apply later_contractive.
-        destruct n; [split; lia|]. apply dist_later_S.
+        destruct n; [apply dist_later_0|]. apply dist_later_S.
         have H1 := Eq4 (x.2) a g tid.
         rewrite <- dist_later_S in H1. f_equiv. apply H1.
     - move=>/= n ty ty' ???? Eq4 ? x d g tid.
@@ -92,7 +92,7 @@ Section typing.
       * apply guards_contractive_right_if_n_ge_1; first by lia. trivial.
       * replace (g + 1) with (S g); last by lia. 
         apply later_contractive.
-        destruct n; [split; lia|]. apply dist_later_S.
+        destruct n; [apply dist_later_0|]. apply dist_later_S.
         have H1 := Eq4 (x.2) a g tid.
         rewrite <- dist_later_S in H1. f_equiv. apply H1.
     - done.

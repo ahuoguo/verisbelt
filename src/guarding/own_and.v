@@ -3,12 +3,13 @@ From iris.algebra Require Import functions.
 From iris.algebra Require Import gmap.
 From iris.prelude Require Import options.
 
-From iris.base_logic Require Import upred.
+From iris.base_logic Require Import upred bi.
 From iris.base_logic.lib Require Export own iprop.
+From iris.bi Require Import sbi_unfold.
 
 From iris.algebra Require Import auth.
 
-From iris.proofmode Require Export tactics.
+From iris.proofmode Require Export proofmode.
 
 (*
   iProp version of a ≼ b.
@@ -32,19 +33,15 @@ Section ConjunctOwnRule2.
   Local Lemma uPred_ownM_and (x y : iResUR Σ) :
     (uPred_ownM x ∧ uPred_ownM y) ⊢ ∃ z , uPred_ownM z ∧ uPred_cmra_incl x z ∧ uPred_cmra_incl y z.
   Proof.
-    uPred.unseal. split. intros n w val_w lhs.
-    unfold upred.uPred_and_def in lhs. unfold uPred_holds in lhs.
-    unfold upred.uPred_ownM_def in lhs. destruct lhs as [x_incl_w y_incl_w].
-
-    unfold upred.uPred_exist_def. unfold uPred_holds. exists w.
-    unfold upred.uPred_and_def.
-    split.
-    { unfold uPred_holds. unfold upred.uPred_ownM_def. trivial. }
-    unfold uPred_holds. unfold uPred_cmra_incl.
-    uPred.unseal. unfold upred.uPred_internal_eq_def. unfold uPred_holds.
-    split.
-    { unfold includedN in x_incl_w. trivial. }
-    { unfold includedN in x_incl_w. trivial. }
+    iIntros "Hand".
+    iAssert (∀ b : bool, uPred_ownM (if b then x else y))%I with "[Hand]" as "Hf".
+    { iIntros ([|]).
+      - iDestruct "Hand" as "[H _]". iExact "H".
+      - iDestruct "Hand" as "[_ H]". iExact "H". }
+    iDestruct (uPred.ownM_forall with "Hf") as (z) "[Hz Hincl]".
+    iExists z. iSplit; [iExact "Hz"|]. iSplit.
+    - iSpecialize ("Hincl" $! true). by rewrite /uPred_cmra_incl /internal_included.
+    - iSpecialize ("Hincl" $! false). by rewrite /uPred_cmra_incl /internal_included.
   Qed.
 
   (* Now, we need to relate `uPred_ownM (iRes_singleton γ _)` to `own γ _` so that we
@@ -103,7 +100,7 @@ Section ConjunctOwnRule2.
     project (own.iRes_singleton γ x) γ ≡ Some x.
   Proof.
     unfold project, own.iRes_singleton. setoid_rewrite discrete_fun_lookup_singleton.
-    rewrite lookup_singleton. f_equiv. setoid_rewrite own.inG_fold_unfold.
+    rewrite lookup_singleton_eq. f_equiv. setoid_rewrite own.inG_fold_unfold.
     rewrite cmra_transport_trans eq_trans_sym_inv_r /=. trivial.
   Qed.
 
@@ -132,26 +129,28 @@ Section ConjunctOwnRule2.
       intros x'.
       have h : Decision (inG_id i = x') by solve_decision. destruct h.
       + setoid_rewrite discrete_fun_lookup_op. subst x'.
-        setoid_rewrite discrete_fun_lookup_singleton.
-        setoid_rewrite discrete_fun_lookup_insert.
+        rewrite discrete_fun_lookup_singleton.
+        rewrite discrete_fun_lookup_insert.
         intro γ0.
         have h1 : Decision (γ = γ0) by solve_decision. destruct h1.
-        * subst γ0. rewrite lookup_op. rewrite lookup_delete.
-          rewrite lookup_singleton. rewrite e.
+        * subst γ0. rewrite lookup_op. 
+          rewrite lookup_delete_eq.
+          rewrite lookup_singleton_eq. rewrite e.
           unfold "⋅", cmra_op, optionR, option_op_instance, union_with, option_union_with.
           f_equiv.
           setoid_rewrite <- X.
           rewrite cmra_transport_trans eq_trans_sym_inv_l /=.
           setoid_rewrite own.inG_unfold_fold. trivial.
-        * rewrite lookup_op. rewrite lookup_delete_ne; trivial.
+        * rewrite lookup_op. 
+          rewrite lookup_delete_ne; trivial.
           rewrite lookup_singleton_ne; trivial.
           unfold "⋅", cmra_op, optionR, option_op_instance, union_with, option_union_with.
           destruct (z (inG_id i) !! γ0) eqn:s.
           ++ rewrite s. trivial.
           ++ rewrite s. trivial.
-      + setoid_rewrite discrete_fun_lookup_op.
-        setoid_rewrite discrete_fun_lookup_singleton_ne; trivial.
-        setoid_rewrite discrete_fun_lookup_insert_ne; trivial.
+      + rewrite discrete_fun_lookup_op.
+        rewrite discrete_fun_lookup_singleton_ne; last done.
+        rewrite discrete_fun_lookup_insert_ne; last done.
         symmetry.
         apply ucmra_unit_left_id.
     - inversion p.
@@ -170,16 +169,12 @@ Section ConjunctOwnRule2.
 
   Local Lemma uPred_ucmra_incl_implies_incl_at_γ γ x z' z :
       project z γ = Some z' →
-        uPred_cmra_incl (own.iRes_singleton γ x) z ⊢ 
+        uPred_cmra_incl (own.iRes_singleton γ x) z ⊢
             @uPred_cmra_incl Σ (option A) (Some x) (Some z').
   Proof.
-    intros proj_eqn. unfold uPred_cmra_incl. unfold uPred_cmra_incl.
-    uPred.unseal. split. intros n x0 val_x0 uh.
-    unfold upred.uPred_exist_def, uPred_holds in uh.
-    unfold upred.uPred_internal_eq_def in uh.
-    unfold uPred_holds, upred.uPred_exist_def.
-    unfold upred.uPred_internal_eq_def, uPred_holds.
-    destruct uh as [c uh]. exists (project c γ).
+    intros proj_eqn. rewrite /uPred_cmra_incl.
+    sbi_unfold=> n [c uh].
+    exists (project c γ).
     assert (project z γ ≡{n}≡ project (own.iRes_singleton γ x) γ ⋅ project c γ) as X.
       { setoid_rewrite <- project_op. setoid_rewrite <- uh. trivial. }
     setoid_rewrite project_iRes_singleton in X.
@@ -196,12 +191,8 @@ Section ConjunctOwnRule2.
     : project z γ = None →
         @uPred_cmra_incl Σ (iResUR Σ) (own.iRes_singleton γ x) z ⊢ False.
   Proof.
-    intros proj_eqn. unfold uPred_cmra_incl. unfold uPred_cmra_incl.
-    uPred.unseal. split. intros n x0 val_x0 uh.
-    unfold upred.uPred_exist_def, uPred_holds in uh.
-    unfold upred.uPred_internal_eq_def in uh.
-    exfalso.
-    destruct uh as [c uh].
+    intros proj_eqn. rewrite /uPred_cmra_incl.
+    sbi_unfold=> n [c uh].
     assert (project z γ ≡{n}≡ project (own.iRes_singleton γ x) γ ⋅ project c γ) as X.
       { setoid_rewrite <- project_op. setoid_rewrite <- uh. trivial. }
     setoid_rewrite project_iRes_singleton in X.

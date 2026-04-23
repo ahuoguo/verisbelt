@@ -5,7 +5,7 @@ From guarding Require Import guard tactics.
 From lrust.lifetime Require Import lifetime_full.
 From guarding.lib Require Import cancellable.
 Set Default Proof Using "Type".
-From Coq.Logic Require Import Classical_Prop.
+From Stdlib.Logic Require Import Classical_Prop.
 
 Implicit Type 𝔄 𝔅: syn_type.
 

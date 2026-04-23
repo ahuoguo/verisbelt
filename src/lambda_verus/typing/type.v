@@ -351,7 +351,7 @@ Next Obligation. move=> * //=. Qed.
 Next Obligation. move=> * //=. by rewrite gt_size0. Qed.
 Next Obligation. move=> * //=. by rewrite gt_phys0. Qed.
 Next Obligation. iIntros "**". iFrame. iIntros. done. Qed.
-Next Obligation. iIntros "**". iFrame. iIntros. done. Qed.
+Next Obligation. iIntros "**". iFrame. Qed.
 Next Obligation. move=> >. intros Hin. rewrite gt_non_prophetic in Hin; trivial. set_solver. Qed.
 Next Obligation. iIntros. done. Qed.
 
@@ -393,10 +393,12 @@ Section ofe.
 
   Definition type_ofe_mixin {𝔄} : OfeMixin (type 𝔄).
   Proof.
-    apply (iso_ofe_mixin type_unpack);
-    (rewrite /type_unpack; split; [by move=> [->->->??]|]);
-    move=> [[[[[/=??]?]?]?]?]; constructor; try apply leibniz_equiv;
-    try done; by eapply (discrete_iff _ _).
+    apply (iso_ofe_mixin type_unpack).
+    - rewrite /type_unpack. intros y1 y2. split; [by move=> [->->->??]|].
+      move=> [[[[[/=??]?]?]?]?]. constructor; try done; by apply leibniz_equiv.
+    - rewrite /type_unpack. intros n y1 y2. split; [by move=> [->->->??]|].
+      move=> [[[[[/=??]?]?]?]?]. constructor; try done;
+      apply leibniz_equiv; eapply discrete_iff; eauto; apply _.
   Qed.
   Canonical Structure typeO 𝔄 : ofe := Ofe (type 𝔄) type_ofe_mixin.
 End ofe.

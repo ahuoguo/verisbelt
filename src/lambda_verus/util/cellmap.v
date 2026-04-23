@@ -38,7 +38,7 @@ Section Cmap.
   Local Lemma 𝜙build_assoc j1 z1 j2 z2 y :
       j1 ≠ j2 → 𝜙build j1 z1 (𝜙build j2 z2 y) = 𝜙build j2 z2 (𝜙build j1 z1 y).
   Proof.
-      intros Hne. unfold 𝜙build. destruct j1, j2; trivial. apply insert_commute. congruence.
+      intros Hne. unfold 𝜙build. destruct j1, j2; trivial. apply insert_insert_ne. congruence.
   Qed.
       
   Local Definition 𝜙_lookup l 𝛼 :
@@ -49,7 +49,7 @@ Section Cmap.
       setoid_rewrite map_fold_insert; try typeclasses eauto; try eauto using 𝜙build_assoc.
       unfold 𝜙build. destruct x as [l'|c'].
          - fold 𝜙build. unfold 𝜙 in IH𝛼. destruct (decide (l = l')) as [He|Hn].
-            + subst l'. rewrite lookup_insert. rewrite lookup_insert. destruct T; trivial.
+            + subst l'. rewrite lookup_insert_eq. rewrite lookup_insert_eq. destruct T; trivial.
             + rewrite lookup_insert_ne; last by done. rewrite IH𝛼.
               rewrite lookup_insert_ne; last by congruence. trivial.
          - fold 𝜙build. unfold 𝜙 in IH𝛼. rewrite IH𝛼. 
@@ -60,7 +60,7 @@ Section Cmap.
       𝜙 (<[ inl l := (cells, v) ]> 𝛼) = <[ l := v ]> (𝜙 𝛼).
   Proof.
       apply map_eq. intros k. destruct (decide (k = l)) as [He|Hn].
-       - subst l. rewrite 𝜙_lookup. do 2 (rewrite lookup_insert). trivial.
+       - subst l. rewrite 𝜙_lookup. do 2 (rewrite lookup_insert_eq). trivial.
        - rewrite lookup_insert_ne; last by done. do 2 (rewrite 𝜙_lookup).
          rewrite lookup_insert_ne; last by congruence. trivial.
   Qed.
@@ -76,7 +76,7 @@ Section Cmap.
       𝜙 (delete (inl l) 𝛼) = delete l (𝜙 𝛼).
   Proof.
       apply map_eq. intros k. destruct (decide (k = l)) as [He|Hn].
-       - subst l. rewrite 𝜙_lookup. do 2 (rewrite lookup_delete). trivial.
+       - subst l. rewrite 𝜙_lookup. do 2 (rewrite lookup_delete_eq). trivial.
        - rewrite lookup_delete_ne; last by done. do 2 (rewrite 𝜙_lookup).
          rewrite lookup_delete_ne; last by congruence. trivial.
   Qed.
@@ -114,12 +114,12 @@ Section Cmap.
       cells_no_dupes (<[k := (cells, v')]> 𝛼).
   Proof using C EqDecision0 EqDecision1 H H0 L V.
       unfold cells_no_dupes. intros Hsome Hc.
-      rewrite <- (insert_delete_insert 𝛼).
+      rewrite <- (insert_delete_eq 𝛼).
       setoid_rewrite map_fold_insert;
         try typeclasses eauto; try eauto using cell_list_build_assoc.
        - have h1 := map_fold_delete (≡ₚ) cell_list_build [] k (cells, v) 𝛼 _ _ Hsome.
          setoid_rewrite <- h1; try typeclasses eauto; try eauto using cell_list_build_assoc.
-       - rewrite lookup_delete. trivial.
+       - rewrite lookup_delete_eq. trivial.
   Qed.
   
   
@@ -132,18 +132,18 @@ Section Cmap.
          rewrite (map_fold_delete (≡ₚ) cell_list_build [] k p 𝛼 _ _ Hlookup) in Hc;
             try eauto using cell_list_build_assoc.
          unfold cell_list_build in Hc. rewrite NoDup_app in Hc. intuition.
-       - rewrite delete_notin; done.
+       - rewrite delete_id; done.
   Qed.
   
   Local Lemma cells_no_dupes_insert_emp 𝛼 k v :
       cells_no_dupes 𝛼 →
       cells_no_dupes (<[ k := ([], v) ]> 𝛼).
   Proof.
-      rewrite <- (insert_delete_insert 𝛼). intros Hb.
+      rewrite <- (insert_delete_eq 𝛼). intros Hb.
       have Hc := cells_no_dupes_delete 𝛼 k Hb.
       unfold cells_no_dupes, cell_list in Hc. unfold cells_no_dupes, cell_list.
       rewrite (map_fold_insert (≡ₚ)); try eauto using cell_list_build_assoc.
-      rewrite lookup_delete. trivial.
+      rewrite lookup_delete_eq. trivial.
   Qed.
   
   Local Lemma cells_no_dupes_get_no_dupes 𝛼 k cells v :
@@ -152,13 +152,13 @@ Section Cmap.
   Proof.
     intros Hc Hsome.
     assert (<[k:=(cells, v)]> (delete k 𝛼) = <[k:=(cells, v)]> 𝛼) as X
-        by apply insert_delete_insert.
+        by apply insert_delete_eq.
     rewrite (insert_id 𝛼) in X; last by trivial.
     rewrite <- X in Hc.
     unfold cells_no_dupes, cell_list in Hc.
     rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc.
      - unfold cell_list_build in Hc. rewrite NoDup_app in Hc. intuition.
-     - apply lookup_delete.
+     - apply lookup_delete_eq.
   Qed.
   
   Local Lemma cells_no_dupes_duplicate_contradiction 𝛼 k c (cs1 cs2 cs3: list C) v :
@@ -200,15 +200,15 @@ Section Cmap.
   Proof.
       intros Hc Hne Ha1 Ha2.
       assert (<[k := (cells, v)]> (<[k' := (cells', v')]> (delete k' (delete k 𝛼))) = 𝛼) as X. {
-         rewrite insert_delete. { rewrite insert_delete; trivial. }
-         rewrite lookup_delete_ne; done.
+        rewrite insert_delete_id. { apply insert_delete_id; trivial. }
+        rewrite lookup_delete_ne; done.
       }
       rewrite <- X in Hc. unfold cells_no_dupes, cell_list in Hc.
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc.
        2: { rewrite lookup_insert_ne; last by done. rewrite lookup_delete_ne; last by done.
-            apply lookup_delete. }
+            apply lookup_delete_eq. }
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc.
-       2: { apply lookup_delete. }
+       2: { apply lookup_delete_eq. }
       unfold cell_list_build in Hc. rewrite List.app_assoc in Hc.
       do 2 (rewrite NoDup_app in Hc). intuition.
   Qed.
@@ -236,7 +236,7 @@ Section Cmap.
       repeat (rewrite NoDup_app). repeat (rewrite NoDup_cons).
       intros [[Ha [Hb [Hc Hd]]] [He Hf]]. intuition.
        - apply (Hb x); trivial. rewrite elem_of_cons. right; trivial.
-       - apply (He x); trivial. decompose_elem_of_list.
+       - apply (He x); trivial. decompose_list_elem_of.
          + rewrite elem_of_app. left; trivial.
          + rewrite elem_of_app. right. rewrite elem_of_cons. right; trivial.
   Qed.
@@ -248,14 +248,14 @@ Section Cmap.
   Proof.
       intros Hsome Hc.
       assert ((<[k := (cells1 ++ c :: cells2, v)]> (delete k 𝛼)) = 𝛼) as X. {
-          apply insert_delete. trivial.
+          apply insert_delete_id. trivial.
       }
       rewrite <- X in Hc. unfold cells_no_dupes, cell_list in Hc.
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc;
-          last by apply lookup_delete.
-      rewrite <- (insert_delete_insert 𝛼). unfold cells_no_dupes, cell_list.
+          last by apply lookup_delete_eq.
+      rewrite <- (insert_delete_eq 𝛼). unfold cells_no_dupes, cell_list.
       rewrite (map_fold_insert (≡ₚ)); try eauto using cell_list_build_assoc;
-          last by apply lookup_delete.
+          last by apply lookup_delete_eq.
       unfold cell_list_build. unfold cell_list_build in Hc.
       apply (no_dup_remove1 _ _ _ _ Hc).
   Qed.
@@ -268,22 +268,22 @@ Section Cmap.
       cells_no_dupes (<[ k1 := (cells1 ++ cells2, v3) ]> (delete k2 𝛼)).
   Proof.
       intros Hne Ha1 Ha2 Hc.
-      rewrite <- (insert_delete_insert (delete k2 𝛼)).
+      rewrite <- (insert_delete_eq (delete k2 𝛼)).
       assert (<[k1 := (cells1, v1)]> (<[k2 := (cells2, v2)]> (delete k1 (delete k2 𝛼))) = 𝛼)
         as X. {
         rewrite <- (delete_insert_ne (delete k2 𝛼)); last by trivial.
-        rewrite insert_delete. 2: { rewrite lookup_insert_ne; last by done.
+        rewrite insert_delete_id. 2: { rewrite lookup_insert_ne; last by done.
           rewrite lookup_delete_ne; last by done. trivial. }
-        apply insert_delete. trivial.
+        apply insert_delete_id. trivial.
       }
       rewrite <- X in Hc. unfold cells_no_dupes, cell_list in Hc.
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc.
-          2: { rewrite lookup_insert_ne; last by done. apply lookup_delete. }
+          2: { rewrite lookup_insert_ne; last by done. apply lookup_delete_eq. }
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc.
-          2: { rewrite lookup_delete_ne; last by done. apply lookup_delete. }
+          2: { rewrite lookup_delete_ne; last by done. apply lookup_delete_eq. }
       unfold cells_no_dupes, cell_list.
       rewrite (map_fold_insert (≡ₚ)); try eauto using cell_list_build_assoc.
-          2: { apply lookup_delete. }
+          2: { apply lookup_delete_eq. }
       unfold cell_list_build. unfold cell_list_build in Hc.
       simpl. rewrite <- List.app_assoc. apply Hc.
   Qed.
@@ -300,17 +300,17 @@ Section Cmap.
           (<[k1:=(cells1, v1)]> (<[k2:=(cells2, v2)]> 𝛼)))
       as X. {
         rewrite <- (delete_insert_ne 𝛼); last by trivial.
-        apply insert_delete_insert.
+        apply insert_delete_eq.
       }
       assert (<[k1 := (cells1 ++ cells2, v3)]> (delete k1 𝛼) = 𝛼) as Y. {
-        apply insert_delete. trivial.
+        apply insert_delete_id. trivial.
       }
       rewrite <- X. unfold cells_no_dupes, cell_list.
       rewrite <- Y in Hc. unfold cells_no_dupes, cell_list in Hc.
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc.
-          2: { apply lookup_delete. }
+          2: { apply lookup_delete_eq. }
       rewrite (map_fold_insert (≡ₚ)); try eauto using cell_list_build_assoc.
-          2: { rewrite lookup_insert_ne; last by done. apply lookup_delete. }
+          2: { rewrite lookup_insert_ne; last by done. apply lookup_delete_eq. }
       rewrite (map_fold_insert (≡ₚ)); try eauto using cell_list_build_assoc.
           2: { rewrite lookup_delete_ne; done. }
       unfold cell_list_build. unfold cell_list_build in Hc.
@@ -639,12 +639,12 @@ Section Cmap.
       fresh_cell_id 𝛼 c → 𝛼 !! k = Some (cells, v) → c ∉ cells.
   Proof.
       intros Hfresh Hl.
-      assert (<[k:=(cells, v)]> (delete k 𝛼) = 𝛼) as X. { by rewrite insert_delete. }
+      assert (<[k:=(cells, v)]> (delete k 𝛼) = 𝛼) as X. { by apply insert_delete_id. }
       rewrite <- X in Hfresh. unfold fresh_cell_id, cell_list in Hfresh.
       setoid_rewrite map_fold_insert in Hfresh;
         try typeclasses eauto; try eauto using cell_list_build_assoc.
       - unfold cell_list_build in Hfresh. rewrite not_elem_of_app in Hfresh. intuition.
-      - apply lookup_delete.
+      - apply lookup_delete_eq.
   Qed.
   
   Local Lemma fresh_cell_not_in_𝛽 𝛼 𝛽 𝜃 c :
@@ -680,7 +680,7 @@ Section Cmap.
         try typeclasses eauto; try eauto using cell_list_build_assoc.
       intros Hnodup. unfold cell_list_build. rewrite NoDup_app.
       split; first by apply NoDup_singleton. split; last by trivial.
-      intros x. simpl. rewrite elem_of_list_singleton. intros ->. apply Hc.
+      intros x. simpl. rewrite list_elem_of_singleton. intros ->. apply Hc.
   Qed.
   
   (* utils *)
@@ -713,8 +713,8 @@ Section Cmap.
     destruct big as [fine_inv [unt_inv no_dupes]].
     split; [split; [|split] | split].
       - intros src dst Hl. destruct (decide (src = inl l)).
-        { subst src. rewrite lookup_insert in Hl. inversion Hl. subst dst.
-          apply lookup_insert. }
+        { subst src. rewrite lookup_insert_eq in Hl. inversion Hl. subst dst.
+          apply lookup_insert_eq. }
         rewrite lookup_insert_ne in Hl; last by done.
         have f1 := fine_inv _ _ Hl.
         unfold 𝛼_fine_pair, 𝛼_alloc. unfold 𝛼_fine_pair in f1.
@@ -753,7 +753,7 @@ Section Cmap.
     have f0 := fine_inv _ _ Hsome. unfold 𝛼_fine_pair in f0.
     split; [split; [|split] | ].
       - intros src dst Hl. destruct (decide (src = inl l)).
-        { subst src. rewrite lookup_delete in Hl. discriminate. }
+        { subst src. rewrite lookup_delete_eq in Hl. discriminate. }
         rewrite lookup_delete_ne in Hl; last by done.
         have f1 := fine_inv _ _ Hl.
         unfold 𝛼_fine_pair, 𝛼_delete. unfold 𝛼_fine_pair in f1.
@@ -809,7 +809,7 @@ Section Cmap.
       read (<[lc:=inl c]> 𝛽) lc (c :: cells) cv.
   Proof.
       intros Hnone Hr. split.
-       - rewrite lookup_insert. trivial.
+       - rewrite lookup_insert_eq. trivial.
        - apply (read_𝛽_mono _ _ _ 𝛽); trivial. apply insert_subseteq. trivial.
   Qed.
   
@@ -836,7 +836,7 @@ Section Cmap.
       read 𝛽 (inr c) cells cv → read (delete (inr c') 𝛽) (inr c) cells cv.
   Proof.
       induction cells in c |- *.
-      - unfold read. intros Hc. rewrite elem_of_list_singleton in Hc.
+      - unfold read. intros Hc. rewrite list_elem_of_singleton in Hc.
         rewrite lookup_delete_ne; trivial. intros Ha. inversion Ha. subst c'. done.
       - intros Hnotin Hread. destruct Hread as [Hr Hread].
         do 2 (rewrite not_elem_of_cons in Hnotin). 
@@ -1020,7 +1020,7 @@ Section Cmap.
       read 𝛽 (inl l) (prefix ++ [last]) cv →
       last ∉ prefix.
   Proof.
-      intros big Hr InPrefix. destruct (elem_of_list_split _ _ InPrefix) as [cs1 [cs2 Heq]].
+      intros big Hr InPrefix. destruct (list_elem_of_split _ _ InPrefix) as [cs1 [cs2 Heq]].
       subst prefix. rewrite <- List.app_assoc in Hr. simpl in Hr.
       eauto using read_duplicate_contradiction.
   Qed.
@@ -1031,7 +1031,7 @@ Section Cmap.
       c ∉ cells.
   Proof.
       intros Hr big InCells.
-      destruct (elem_of_list_split _ _ InCells) as [cs1 [cs2 Heq']]. subst cells.
+      destruct (list_elem_of_split _ _ InCells) as [cs1 [cs2 Heq']]. subst cells.
       destruct cv as [c1|v1].
        - have Ha := read_c_c_gives_𝛼_row 𝛼 𝛽 ∅ _ _ _ Hr big.
          destruct Ha as [k [cells1 [cells2 [v Heq]]]].
@@ -1080,7 +1080,7 @@ Section Cmap.
     induction cells as [|c0 cells0] in c, cells' |- *.
      - unfold read. rewrite map_lookup_filter_Some. intros Hb. split; trivial.
        unfold rrc_filter. simpl. rewrite elem_of_app. right.
-       rewrite elem_of_list_singleton; trivial.
+       rewrite list_elem_of_singleton; trivial.
      - intros [Hr Hrest]. split.
        + rewrite map_lookup_filter_Some. split; first trivial.
          unfold rrc_filter. simpl. rewrite elem_of_app. right. apply elem_of_cons.
@@ -1141,8 +1141,8 @@ Section Cmap.
   Proof.
     intros big Hne Hread Hread'. apply read_with_filter_comp; trivial.
     intros c Hc Hc'.
-    destruct (elem_of_list_split _ _ Hc) as [d1 [d2 Heq]]. subst cells.
-    destruct (elem_of_list_split _ _ Hc') as [d1' [d2' Heq']]. subst cells'.
+    destruct (list_elem_of_split _ _ Hc) as [d1 [d2 Heq]]. subst cells.
+    destruct (list_elem_of_split _ _ Hc') as [d1' [d2' Heq']]. subst cells'.
     destruct cv as [c1|v1]; destruct cv' as [c1'|v1'].
      - destruct (read_l_c_gives_𝛼_row 𝛼 𝛽 𝜃 l _ c1 Hread big) as [cells2 [v Hrow]].
        destruct (read_l_c_gives_𝛼_row 𝛼 𝛽 𝜃 l' _ c1' Hread' big) as [cells2' [v' Hrow']].
@@ -1217,7 +1217,7 @@ Section Cmap.
       read (<[inr c:=cv']> 𝛽) lc (cells ++ [c]) cv'.
   Proof.
       induction cells in lc |- *.
-       - intros Ha Hb [Hc Hd]. simpl. rewrite lookup_insert.
+       - intros Ha Hb [Hc Hd]. simpl. rewrite lookup_insert_eq.
          rewrite lookup_insert_ne; last by done. split; trivial.
        - intros Ha Hb [Hc Hd]. simpl.
          rewrite lookup_insert_ne; last by done. split; trivial.
@@ -1232,7 +1232,7 @@ Section Cmap.
   Proof.
       intros Hr big. unfold write. 
       destruct (case_last_lc l cells) as [[Hll Hcells]|[prefix [last [Hlc Hcells]]]].
-       - subst cells. rewrite Hll. unfold read. rewrite lookup_insert. trivial.
+       - subst cells. rewrite Hll. unfold read. rewrite lookup_insert_eq. trivial.
        - rewrite Hlc. rewrite Hcells. rewrite Hcells in Hr.
          apply (read_of_write' 𝛼 𝛽 𝜃 _ _ _ cv); trivial; first by discriminate.
          apply (read_last_not_in_prefix 𝛼 𝛽 𝜃 _ _ _ _ big Hr).
@@ -1266,15 +1266,15 @@ Section Cmap.
       split; last split.
       - intros src dst Hlookup'. unfold 𝛼_fine_pair, 𝛼_write. unfold write in Hlookup'.
         destruct (decide (src = last_lc l cells)).
-        + subst src. rewrite lookup_insert in Hlookup'. inversion Hlookup'. subst dst.
+        + subst src. rewrite lookup_insert_eq in Hlookup'. inversion Hlookup'. subst dst.
           destruct (case_last_lc l cells) as [[Hll Hcells]|[prefix [last [Hlc Hcells]]]].
-          * rewrite Hll. rewrite lookup_insert. rewrite Hcells. trivial.
-          * rewrite Hlc. exists (inl l), cells. rewrite lookup_insert.
+          * rewrite Hll. rewrite lookup_insert_eq. rewrite Hcells. trivial.
+          * rewrite Hlc. exists (inl l), cells. rewrite lookup_insert_eq.
             split; trivial. subst cells. apply list_ends_with_app_r. done.
         + rewrite lookup_insert_ne in Hlookup'; last done.
           have f1 := (fine_inv src dst Hlookup'). unfold 𝛼_fine_pair in f1.
           destruct (decide (inl l = src)).
-          * subst src. rewrite lookup_insert. rewrite H𝛼row in f1. destruct dst.
+          * subst src. rewrite lookup_insert_eq. rewrite H𝛼row in f1. destruct dst.
            -- apply f1.
            -- inversion f1. subst cells. done.
           * destruct src; last destruct dst.
@@ -1283,7 +1283,7 @@ Section Cmap.
             -- destruct f1 as [lu1 [cs1 [v1 [Hsome Hpair]]]].
                destruct (decide (lu1 = inl l)) as [He2|Hn2].
                ++ subst lu1. rewrite H𝛼row in Hsome. inversion Hsome. subst v1. subst cs1.
-                  exists (inl l), cells, v'. rewrite lookup_insert. split; trivial.
+                  exists (inl l), cells, v'. rewrite lookup_insert_eq. split; trivial.
                ++ exists lu1, cs1, v1. rewrite lookup_insert_ne; last by done. split; trivial.
             -- destruct f1 as [lu1 [cs1 [Hsome Hpair]]].
                destruct (decide (lu1 = inl l)) as [He2|Hn2].
@@ -1320,8 +1320,8 @@ Section Cmap.
         rewrite lookup_insert_ne; last by done. trivial.
         apply (fine_inv (inl l') dst Hlookup').
       + destruct (decide (c' = c)) as [He|Hn].
-        * subst c'. rewrite lookup_insert in Hlookup'. inversion Hlookup'.
-          exists (inr u), [c]. rewrite lookup_insert. split; done.
+        * subst c'. rewrite lookup_insert_eq in Hlookup'. inversion Hlookup'.
+          exists (inr u), [c]. rewrite lookup_insert_eq. split; done.
         * rewrite lookup_insert_ne in Hlookup'; last by congruence.
           have Hf := (fine_inv (inr c') dst Hlookup'). unfold 𝛼_fine_pair in Hf.
           destruct dst as [c''|v''].
@@ -1333,8 +1333,8 @@ Section Cmap.
              exists lu, cs. rewrite lookup_insert_ne; last by done. split; trivial.
   - intros u1 cell1 v1 Hs. 
     unfold 𝛼_alloc_unt. destruct (decide (u = u1)).
-    + subst u1. rewrite lookup_insert in Hs. inversion Hs. subst cell1. subst v1.
-      rewrite lookup_insert. split; trivial.
+    + subst u1. rewrite lookup_insert_eq in Hs. inversion Hs. subst cell1. subst v1.
+      rewrite lookup_insert_eq. split; trivial.
     + rewrite lookup_insert_ne in Hs; last by done. have Hu1 := unt_inv u1 cell1 v1 Hs.
       rewrite lookup_insert_ne; last by congruence. apply Hu1.
   - apply cells_no_dupes_of_fresh_singleton; trivial.
@@ -1397,13 +1397,13 @@ Section Cmap.
     split; last split.
     - intros src dst Hlookup'. unfold 𝛼_fine_pair, 𝛼_untether.
       destruct (decide (src = lc)).
-       + subst src. rewrite lookup_insert in Hlookup'. inversion Hlookup'.
+       + subst src. rewrite lookup_insert_eq in Hlookup'. inversion Hlookup'.
          destruct lc as [l0|c0].
          * destruct k as [l1|u1].
            -- destruct (facts_from_last_lc_is_l _ _ _ Hrow) as [Hleq Hcellsempty].
-              subst l1. subst cells1. rewrite lookup_insert. trivial.
+              subst l1. subst cells1. rewrite lookup_insert_eq. trivial.
            -- destruct (last_c cells1); done.
-         * exists k, cells1. rewrite lookup_insert. split; trivial.
+         * exists k, cells1. rewrite lookup_insert_eq. split; trivial.
            destruct k as [l1|u1].
            -- destruct (facts_from_last_lc_is_c _ _ _ Hrow) as [prefix Hcellseq].
               rewrite Hcellseq. apply list_ends_with_app_singleton.
@@ -1413,7 +1413,7 @@ Section Cmap.
         have f1 := fine_inv src dst Hlookup'. unfold 𝛼_fine_pair in f1.
         destruct src as [l0|c0].
         * destruct (decide (inl l0 = k)) as [He1|Hn1].
-          -- subst k.  rewrite lookup_insert. rewrite H𝛼k in f1. destruct dst.
+          -- subst k.  rewrite lookup_insert_eq. rewrite H𝛼k in f1. destruct dst.
             ++ destruct cells1.
               ** simpl in f1. subst c0. rewrite Hrow in n. done.
               ** simpl in f1. trivial.
@@ -1424,9 +1424,9 @@ Section Cmap.
              destruct (decide (k' = k)) as [Hn2|He2].
              ++ subst k'. rewrite H𝛼k in H𝛼k'. inversion H𝛼k'. subst v'. subst cells'.
                 destruct (list_has_pair_app_case _ _ _ _ HasPair) as [front|[back|middle]].
-              ** exists k, cells1, v. rewrite lookup_insert. split; trivial.
+              ** exists k, cells1, v. rewrite lookup_insert_eq. split; trivial.
               ** exists (inr u), (c :: cells2), v.
-                 rewrite lookup_insert_ne; last by done. rewrite lookup_insert.
+                 rewrite lookup_insert_ne; last by done. rewrite lookup_insert_eq.
                  split; trivial.
               ** destruct middle as [cells0 Hcellseq]. subst cells1.
                  destruct k.
@@ -1441,7 +1441,7 @@ Section Cmap.
              ++ subst k'. rewrite H𝛼k in H𝛼k'. inversion H𝛼k'. subst v1. subst cells'.
                 have HasPair2 := (list_ends_with_app_r_rev _ _ _ _ HasPair).
                 exists (inr u), (c :: cells2).
-                rewrite lookup_insert_ne; last by done. rewrite lookup_insert.
+                rewrite lookup_insert_ne; last by done. rewrite lookup_insert_eq.
                 split; trivial.
              ++ exists k', cells'.
                 have k'_ne := fresh_ne_to_existing_key _ _ _ _ H𝛼k' Hu.
@@ -1449,11 +1449,11 @@ Section Cmap.
                 split; trivial.
   - intros u1 cell1 v1 Hs. 
     unfold 𝛼_untether. destruct (decide (u = u1)).
-    + subst u1. rewrite lookup_insert in Hs. inversion Hs. subst cell1. subst v1.
-      rewrite lookup_insert_ne; last by done. rewrite lookup_insert. split; trivial.
+    + subst u1. rewrite lookup_insert_eq in Hs. inversion Hs. subst cell1. subst v1.
+      rewrite lookup_insert_ne; last by done. rewrite lookup_insert_eq. split; trivial.
     + rewrite lookup_insert_ne in Hs; last by done. have Hu1 := unt_inv u1 cell1 v1 Hs.
       destruct (decide (inr u1 = k)).
-      * subst k. rewrite lookup_insert. rewrite H𝛼k in Hu1. destruct cells1; done.
+      * subst k. rewrite lookup_insert_eq. rewrite H𝛼k in Hu1. destruct cells1; done.
       * rewrite lookup_insert_ne; last by done.
         rewrite lookup_insert_ne; last by congruence. trivial.
   - unfold 𝛼_untether. apply (cells_no_dupes_split_row _ _ _ _ _ _ _ v); trivial.
@@ -1495,22 +1495,22 @@ Section Cmap.
     destruct Hu1 as [Hu2 Hu3]. subst c1. subst cv1.
     split; last split.
     - intros src dst Hlookup'. destruct (decide (src = last_lc l cells)) as [He|Hn].
-      + unfold write in Hlookup'. subst src. rewrite lookup_insert in Hlookup'.
+      + unfold write in Hlookup'. subst src. rewrite lookup_insert_eq in Hlookup'.
         inversion Hlookup'. subst dst.
         unfold 𝛼_fine_pair.
         destruct (case_last_lc l cells) as [[Hll Hcs]|[prefix [last [Hll Hcs]]]].
-        * subst cells. rewrite Hll. unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert.
+        * subst cells. rewrite Hll. unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert_eq.
           done.
         * subst cells. rewrite Hll. exists (inl l), (prefix ++ [last] ++ c' :: cells1), v.
           split; last by apply list_has_pair_app_app_cons.
-          unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert.
+          unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert_eq.
           rewrite <- List.app_assoc. done.
      + unfold write in Hlookup'.
        rewrite lookup_insert_ne in Hlookup'; last by done.
        have f1 := fine_inv src dst Hlookup'. unfold 𝛼_fine_pair in *.
        destruct src as [sloc|scell].
        * unfold 𝛼_retether. rewrite H𝛼u. destruct (decide (sloc = l)) as [Hsl|Hsl].
-         -- subst sloc. rewrite lookup_insert. rewrite H𝛼row in f1.
+         -- subst sloc. rewrite lookup_insert_eq. rewrite H𝛼row in f1.
             destruct cells; first by contradiction. destruct dst as [dloc|dcell].
             ++ subst dloc. done.
             ++ inversion f1.
@@ -1522,11 +1522,11 @@ Section Cmap.
             ++ subst lu0. rewrite H𝛼u in Hin. inversion Hin. subst cells0. subst v0.
                exists (inl l), (cells ++ c' :: cells1), v.
                split; last by apply list_has_pair_app_r.
-               unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert. done.
+               unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert_eq. done.
             ++ subst lu0. rewrite H𝛼row in Hin. inversion Hin. subst cells0. subst v0.
                exists (inl l), (cells ++ c' :: cells1), v.
                split; last by apply list_has_pair_app_l.
-               unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert. done.
+               unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert_eq. done.
             ++ exists lu0, cells0, v0. unfold 𝛼_retether. rewrite H𝛼u.
                split; last by trivial.
                rewrite lookup_insert_ne; last by done.
@@ -1536,7 +1536,7 @@ Section Cmap.
             ++ subst lu0. rewrite H𝛼u in Hin. inversion Hin. subst cells0.
                exists (inl l), (cells ++ c' :: cells1).
                split; last by apply list_ends_with_app_r.
-               unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert. done.
+               unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert_eq. done.
             ++ subst lu0. rewrite H𝛼row in Hin. inversion Hin. subst cells0.
                exfalso. apply Hn. apply list_ends_with_gives_last_lc. apply Hends.
             ++ exists lu0, cells0. unfold 𝛼_retether. rewrite H𝛼u.
@@ -1544,7 +1544,7 @@ Section Cmap.
                rewrite lookup_insert_ne; last by done.
                rewrite lookup_delete_ne; done.
    - intros u1 cell1 v1 Hl. destruct (decide (u = u1)) as [He|Hn].
-     + subst u1. rewrite lookup_delete in Hl. discriminate.
+     + subst u1. rewrite lookup_delete_eq in Hl. discriminate.
      + rewrite lookup_delete_ne in Hl; last by trivial.
        unfold 𝛼_retether. rewrite H𝛼u. rewrite lookup_insert_ne; last by discriminate.
        rewrite lookup_delete_ne; last by congruence. apply unt_inv. apply Hl.
@@ -1584,18 +1584,18 @@ Section Cmap.
       split; last split.
       - intros src dst Hlookup'. unfold 𝛼_fine_pair, 𝛼_delete_cell.
         destruct (decide (src = lc)) as [He|Hn].
-        + subst src. rewrite lookup_insert in Hlookup'. inversion Hlookup'. subst dst.
+        + subst src. rewrite lookup_insert_eq in Hlookup'. inversion Hlookup'. subst dst.
           destruct lc as [l0|c0].
          * destruct k as [l1|u1].
            -- destruct (facts_from_last_lc_is_l _ _ _ Hrow) as [Hleq Hcellsempty].
-              subst l1. subst cells1. rewrite lookup_insert. destruct cv as [c2|v2].
+              subst l1. subst cells1. rewrite lookup_insert_eq. destruct cv as [c2|v2].
              ++ have e1 := extend_next_after_cell_is_cell _ _ _ _ _ _ _ _ _ H𝛼k big Hp2.
                 destruct e1 as [cells2' Eq]. subst cells2. done.
              ++ have e1 := extend_next_after_cell_is_value _ _ _ _ _ _ _ _ _ H𝛼k big Hp2.
                 destruct e1 as [cells2' Eq]. subst cells2. subst v2. done.
            -- destruct (last_c cells1); done.
          * destruct cv as [c2|v2].
-          -- exists k, (cells1 ++ cells2), v. rewrite lookup_insert. split; trivial.
+          -- exists k, (cells1 ++ cells2), v. rewrite lookup_insert_eq. split; trivial.
              have e1 := extend_next_after_cell_is_cell _ _ _ _ _ _ _ _ _ H𝛼k big Hp2.
              destruct e1 as [cells2' Eq]. subst cells2. destruct k.
               ** destruct (facts_from_last_lc_is_c _ _ _ Hrow) as [prefix Eq]. subst cells1.
@@ -1604,7 +1604,7 @@ Section Cmap.
                 --- rewrite Hnone in Hrow; contradiction.
                 --- rewrite Hsome in Hrow. inversion Hrow. subst last. subst cells1.
                     rewrite <- List.app_assoc. simpl. apply list_has_pair_mid.
-          -- exists k, (cells1 ++ cells2). rewrite lookup_insert.
+          -- exists k, (cells1 ++ cells2). rewrite lookup_insert_eq.
              have e1 := extend_next_after_cell_is_value _ _ _ _ _ _ _ _ _ H𝛼k big Hp2.
              destruct e1 as [cells2' Eq]. subst cells2. subst v2. split; trivial.
              rewrite right_id_L. destruct k.
@@ -1616,12 +1616,12 @@ Section Cmap.
                     apply list_ends_with_app_singleton.
         + rewrite lookup_insert_ne in Hlookup'; last by done.
           destruct (decide (src = inr c)).
-              { subst src. rewrite lookup_delete in Hlookup'. discriminate. }
+              { subst src. rewrite lookup_delete_eq in Hlookup'. discriminate. }
           rewrite lookup_delete_ne in Hlookup'; last by done.
           have f1 := fine_inv _ _ Hlookup'. unfold 𝛼_fine_pair in f1.
           destruct src as [l0|c0].
           * destruct (decide (inl l0 = k)) as [He1|Hn1].
-            -- subst k.  rewrite lookup_insert. rewrite H𝛼k in f1. destruct dst.
+            -- subst k.  rewrite lookup_insert_eq. rewrite H𝛼k in f1. destruct dst.
               ++ destruct cells1.
                 ** simpl in f1. subst c0. rewrite Hrow in Hn. done.
                 ** simpl in f1. trivial.
@@ -1632,9 +1632,9 @@ Section Cmap.
              destruct (decide (k' = k)) as [Hn2|He2].
              ++ subst k'. rewrite H𝛼k in H𝛼k'. inversion H𝛼k'. subst v'. subst cells'.
                 destruct (list_has_pair_app_case _ _ _ _ HasPair) as [front|[back|middle]].
-              ** exists k, (cells1 ++ cells2), v. rewrite lookup_insert. split; trivial.
+              ** exists k, (cells1 ++ cells2), v. rewrite lookup_insert_eq. split; trivial.
                  apply list_has_pair_app_l. trivial.
-              ** exists k, (cells1 ++ cells2), v. rewrite lookup_insert. split; trivial.
+              ** exists k, (cells1 ++ cells2), v. rewrite lookup_insert_eq. split; trivial.
                  apply list_has_pair_app_r. apply (list_has_pair_uncons cells2 c); trivial.
                  congruence.
               ** destruct middle as [cells0 Hcellseq]. subst cells1.
@@ -1647,7 +1647,7 @@ Section Cmap.
              destruct (decide (k' = k)) as [Hn2|He2].
              ++ subst k'. rewrite H𝛼k in H𝛼k'. inversion H𝛼k'. subst v1. subst cells'.
                 have HasPair2 := (list_ends_with_app_r_rev _ _ _ _ HasPair).
-                exists k, (cells1 ++ cells2). rewrite lookup_insert. split; trivial.
+                exists k, (cells1 ++ cells2). rewrite lookup_insert_eq. split; trivial.
                 apply list_ends_with_app_r. apply (list_ends_with_uncons _ c); trivial.
                 congruence.
              ++ exists k', cells'. rewrite lookup_insert_ne; last by done. split; trivial.
@@ -1655,7 +1655,7 @@ Section Cmap.
      unfold 𝛼_delete_cell. 
      have Hu1 := unt_inv u1 cell1 v1 Hs.
      destruct (decide (inr u1 = k)).
-      + subst k. rewrite lookup_insert. rewrite H𝛼k in Hu1. destruct cells1; first by done.
+      + subst k. rewrite lookup_insert_eq. rewrite H𝛼k in Hu1. destruct cells1; first by done.
         apply Hu1.
       + rewrite lookup_insert_ne; last by done. apply Hu1.
    - apply (cells_no_dupes_remove_mid _ _ _ c); trivial.
@@ -1715,17 +1715,17 @@ Section Cmap.
   Proof.
       intros Hfresh Hsome Hc.
       assert ((<[k := (cells1 ++ cells2, v)]> (delete k 𝛼)) = 𝛼) as X. {
-          apply insert_delete. trivial.
+          apply insert_delete_id. trivial.
       }
       rewrite <- X in Hc. unfold cells_no_dupes, cell_list in Hc.
       rewrite (map_fold_insert (≡ₚ)) in Hc; try eauto using cell_list_build_assoc;
-          last by apply lookup_delete.
+          last by apply lookup_delete_eq.
       rewrite <- X in Hfresh. unfold fresh_cell_id, cell_list in Hfresh.
       rewrite (map_fold_insert (≡ₚ)) in Hfresh; try eauto using cell_list_build_assoc;
-          last by apply lookup_delete.
-      rewrite <- (insert_delete_insert 𝛼). unfold cells_no_dupes, cell_list.
+          last by apply lookup_delete_eq.
+      rewrite <- (insert_delete_eq 𝛼). unfold cells_no_dupes, cell_list.
       rewrite (map_fold_insert (≡ₚ)); try eauto using cell_list_build_assoc;
-          last by apply lookup_delete.
+          last by apply lookup_delete_eq.
       unfold cell_list_build. unfold cell_list_build in Hc.
       apply (no_dup_insert1 _ _ _ c); last trivial.
       apply Hfresh.
@@ -1763,17 +1763,17 @@ Section Cmap.
       split; last split.
       - intros src dst Hlookup'. unfold 𝛼_fine_pair, 𝛼_delete_cell.
         destruct (decide (src = inr c)) as [He|Hn].
-        + subst src. rewrite lookup_insert in Hlookup'. inversion Hlookup'. subst dst.
+        + subst src. rewrite lookup_insert_eq in Hlookup'. inversion Hlookup'. subst dst.
           exists k. exists (cells1 ++ c :: new_c :: cells2). exists v.
           split; last by apply list_has_pair_mid.
-          unfold 𝛼_insert_fresh_cell. rewrite lookup_insert. trivial.
+          unfold 𝛼_insert_fresh_cell. rewrite lookup_insert_eq. trivial.
         + rewrite lookup_insert_ne in Hlookup'; last by done.
           destruct (decide (src = inr new_c)) as [He|Hn'].
-          * subst src. rewrite lookup_insert in Hlookup'. inversion Hlookup'. subst dst.
+          * subst src. rewrite lookup_insert_eq in Hlookup'. inversion Hlookup'. subst dst.
             destruct cv as [c2|v2].
           -- exists k, (cells1 ++ c :: new_c :: cells2), v. 
              split.
-             ++ unfold 𝛼_insert_fresh_cell. rewrite lookup_insert. trivial.
+             ++ unfold 𝛼_insert_fresh_cell. rewrite lookup_insert_eq. trivial.
              ++ have e1 := extend_next_after_cell_is_cell _ _ _ _ _ _ _ _ _ Hr big Hp1.
                 destruct e1 as [cells2' e1]. subst cells2.
                 replace ((cells1 ++ c :: new_c :: c2 :: cells2'))
@@ -1784,7 +1784,7 @@ Section Cmap.
              have e1 := extend_next_after_cell_is_value _ _ _ _ _ _ _ _ _ Hr big Hp1.
              destruct e1 as [Hcells2eq Hveq]. subst cells2. subst v2.
              split.
-             ++ unfold 𝛼_insert_fresh_cell. rewrite lookup_insert. trivial.
+             ++ unfold 𝛼_insert_fresh_cell. rewrite lookup_insert_eq. trivial.
              ++ replace (cells1 ++ [c; new_c]) with ((cells1 ++ [c]) ++ [new_c]).
                ** apply list_ends_with_app_singleton.
                ** rewrite <- List.app_assoc. done.
@@ -1792,7 +1792,7 @@ Section Cmap.
             have f1 := fine_inv _ _ Hlookup'. unfold 𝛼_fine_pair in f1.
             destruct src as [l0|c0].
               ** destruct (decide (inl l0 = k)) as [He1|Hn1].
-                -- subst k.  rewrite lookup_insert. rewrite Hr in f1. destruct dst.
+                -- subst k.  rewrite lookup_insert_eq. rewrite Hr in f1. destruct dst.
                   ++ destruct cells1.
                     *** simpl in f1. subst c0. done.
                     *** simpl in f1. trivial.
@@ -1805,11 +1805,11 @@ Section Cmap.
                    replace (cells1 ++ c :: cells2) with ((cells1 ++ [c]) ++ cells2) in HasPair.
                     2: { rewrite <- List.app_assoc. done. }
                     destruct (list_has_pair_app_case _ _ _ _ HasPair) as [front|[back|middle]].
-                    *** exists k, (cells1 ++ c :: new_c :: cells2), v. rewrite lookup_insert. split; trivial. 
+                    *** exists k, (cells1 ++ c :: new_c :: cells2), v. rewrite lookup_insert_eq. split; trivial. 
                     replace (cells1 ++ c :: new_c :: cells2) with ((cells1 ++ [c]) ++ (new_c :: cells2)).
                      ---- apply list_has_pair_app_l. trivial.
                      ---- rewrite <- List.app_assoc. done.
-                  *** exists k, (cells1 ++ c :: new_c :: cells2), v. rewrite lookup_insert. split; trivial.
+                  *** exists k, (cells1 ++ c :: new_c :: cells2), v. rewrite lookup_insert_eq. split; trivial.
                     replace (cells1 ++ c :: new_c :: cells2) with ((cells1 ++ [c]) ++ (new_c :: cells2)).
                     ---- apply list_has_pair_app_r. apply (list_has_pair_cons); trivial.
                     ---- rewrite <- List.app_assoc. done.
@@ -1822,7 +1822,7 @@ Section Cmap.
              destruct (decide (k' = k)) as [Hn2|He2].
              ++ subst k'. rewrite Hr in H𝛼k'. inversion H𝛼k'. subst v1. subst cells'.
                 have HasPair2 := (list_ends_with_app_r_rev _ _ _ _ HasPair).
-                exists k, (cells1 ++ c :: new_c :: cells2). rewrite lookup_insert. split; trivial.
+                exists k, (cells1 ++ c :: new_c :: cells2). rewrite lookup_insert_eq. split; trivial.
                 apply list_ends_with_app_r.
                 replace (c :: new_c :: cells2) with ([c; new_c] ++ cells2); last by done.
                 apply list_ends_with_app_r.
@@ -1833,7 +1833,7 @@ Section Cmap.
      unfold 𝛼_delete_cell. 
      have Hu1 := unt_inv u1 cell1 v1 Hs.
      destruct (decide (inr u1 = k)).
-      + subst k. rewrite lookup_insert. rewrite Hr in Hu1. destruct cells1; first by done.
+      + subst k. rewrite lookup_insert_eq. rewrite Hr in Hu1. destruct cells1; first by done.
         apply Hu1.
       + rewrite lookup_insert_ne; last by done. apply Hu1.
    - unfold 𝛼_insert_fresh_cell.
@@ -2195,11 +2195,15 @@ Section Cmap.
   Proof.
       apply upd_helper_heap_l_𝛽_r_emp. intros 𝛼 𝛽 𝜃 Hheap Hdisj Hinv. exists (𝛼_delete 𝛼 l).
       assert (({[inl l := inr v]} ∪ 𝛽) !! inl l = Some (inr v)) as Hin2.
-        { rewrite lookup_union. rewrite lookup_singleton. apply union_Some_l. }
+        { rewrite lookup_union. rewrite lookup_singleton_eq. apply union_Some_l. }
       have Hinv' := del_preserves_inv 𝛼 ({[inl l := inr v]} ∪ 𝛽) 𝜃 l v Hin2 Hinv. subst σ. 
       rewrite delete_union in Hinv'. rewrite delete_singleton in Hinv'.
-      rewrite map_empty_union in Hinv'. split; first by intuition.
-      rewrite delete_notin in Hinv'; first by intuition. solve_map_disjoint.
+      split; first by intuition.
+      rewrite delete_id in Hinv'. 
+      - rewrite decide_True // left_id_L in Hinv'.
+        destruct Hinv' as [Hinv' _].
+        done.
+      - solve_map_disjoint.
   Qed.
   
   Lemma upd_write σ 𝛽 l cells v v' :
@@ -2224,12 +2228,13 @@ Section Cmap.
       assert (𝛽 ⊆ 𝛽 ∪ 𝛽0) as Hsub by apply map_union_subseteq_l.
       have Hr' := read_𝛽_mono _ _ _ _ _ Hsub Hr.
       rewrite <- (insert_union_singleton_l 𝜃 u (c, v)) in big.
-      assert ((<[u := (c, v)]> 𝜃) !! u = Some (c, v)) as Hl by apply lookup_insert.
+      assert ((<[u := (c, v)]> 𝜃) !! u = Some (c, v)) as Hl by apply lookup_insert_eq.
       split. { apply (retether_preserves_heap _ _ _ _ _ _ _ _ Hr' Hl big). }
       split. { apply (write_preserves_disjointness _ _ _ _ (inr v)); trivial. }
       rewrite (write_union _ _ _ _ (inr v)); trivial.
       have Ha := retether_preserves_inv 𝛼 (𝛽 ∪ 𝛽0) (<[u:=(c, v)]> 𝜃) u l cells v c Hr' Hl big.
-      rewrite delete_insert in Ha; trivial. solve_map_disjoint.
+      rewrite delete_insert_id in Ha. { trivial. }
+      rewrite map_disjoint_singleton_l in Hdisj𝜃. trivial.
   Qed.
   
   Lemma upd_alloc_unt v :
@@ -2262,13 +2267,13 @@ Section Cmap.
       }
       intros 𝛼 𝛽 𝜃 Hdisj Hinv.
       destruct (exists_fresh_cell_id 𝛼) as [new_c freshc].
-      destruct (get_row_containing_cell 𝛼 ({[inr c := cv]} ∪ 𝛽) 𝜃 c cv) as [k [cells1 [cells2 [v Heq]]]]; first trivial. { rewrite lookup_union_l'. { rewrite lookup_singleton. trivial. } rewrite lookup_singleton. trivial. }
+      destruct (get_row_containing_cell 𝛼 ({[inr c := cv]} ∪ 𝛽) 𝜃 c cv) as [k [cells1 [cells2 [v Heq]]]]; first trivial. { rewrite lookup_union_l'. { rewrite lookup_singleton_eq. trivial. } rewrite lookup_singleton_eq. trivial. }
       exists (𝛼_insert_fresh_cell 𝛼 k cells1 c new_c cells2 v).
       exists (<[ inr c := inl new_c ]> ({[ inr new_c := cv ]})).
       have Hf := fresh_cell_not_in_𝛽 𝛼 ({[inr c := cv]} ∪ 𝛽) 𝜃 new_c freshc Hinv.
       assert (c ≠ new_c) as Hne. { intro Heq2. subst new_c.
-        rewrite lookup_union_l' in Hf. { rewrite lookup_singleton in Hf. discriminate. }
-        rewrite lookup_singleton. trivial. }
+        rewrite lookup_union_l' in Hf. { rewrite lookup_singleton_eq in Hf. discriminate. }
+        rewrite lookup_singleton_eq. trivial. }
       assert (𝛽 !! inr c = None). { solve_map_disjoint. }
       assert (𝛽 !! inr new_c = None). { rewrite lookup_union_None in Hf. intuition. }
       split. { exists new_c. split; trivial. }
@@ -2279,15 +2284,15 @@ Section Cmap.
       replace ({[inr c := inl new_c; inr new_c := cv]} ∪ 𝛽) with
         (<[ inr c := inl new_c ]> (<[ inr new_c := cv ]> ({[inr c := cv]} ∪ 𝛽))).
         { apply insert_fresh_cell_preserves_inv; trivial.
-          rewrite lookup_union_l'. { rewrite lookup_singleton. trivial. } rewrite lookup_singleton. trivial. }
+          rewrite lookup_union_l'. { rewrite lookup_singleton_eq. trivial. } rewrite lookup_singleton_eq. trivial. }
       apply map_eq. intros lc.
       destruct (decide (lc = inr c)) as [He|Hn].
-       - subst lc. rewrite lookup_insert. rewrite lookup_union_l'; rewrite lookup_insert; trivial.
+       - subst lc. rewrite lookup_insert_eq. rewrite lookup_union_l'; rewrite lookup_insert_eq; trivial.
        - rewrite lookup_insert_ne; last by done.
          destruct (decide (lc = inr new_c)) as [He'|Hn'].
-         + subst lc. rewrite lookup_insert. rewrite lookup_union_l'.
-           * rewrite lookup_insert_ne; last by congruence. rewrite lookup_singleton. trivial.
-           * rewrite lookup_insert_ne; last by congruence. rewrite lookup_singleton. trivial.
+         + subst lc. rewrite lookup_insert_eq. rewrite lookup_union_l'.
+           * rewrite lookup_insert_ne; last by congruence. rewrite lookup_singleton_eq. trivial.
+           * rewrite lookup_insert_ne; last by congruence. rewrite lookup_singleton_eq. trivial.
          + rewrite lookup_insert_ne; last by done. rewrite lookup_union_r.
            * rewrite lookup_union_r; trivial.
              rewrite lookup_insert_ne; last by done.
@@ -2302,7 +2307,7 @@ Section Cmap.
       { intros z [new𝛽 [new𝜃 [[u [v [Hb Hc]]] Hz]]]. exists v, u. rewrite Hz. rewrite Hb. rewrite Hc. done. }
       intros 𝛼 𝛽 𝜃 Hdisj big.
       destruct (exists_fresh_uid 𝛼) as [u freshu].
-      assert ((<[lc := inl c]> 𝛽) !! lc = Some (inl c)) as Hl by apply lookup_insert.
+      assert ((<[lc := inl c]> 𝛽) !! lc = Some (inl c)) as Hl by apply lookup_insert_eq.
       rewrite <- (insert_union_singleton_l 𝛽 lc (inl c)) in big.
       destruct (get_row_for_lc 𝛼 (<[lc := inl c]> 𝛽) 𝜃 lc c Hl big)
           as [k [cells1 [cells2 [v Hisrow]]]].
@@ -2313,7 +2318,7 @@ Section Cmap.
       split. { solve_map_disjoint. }
       split. { have Hnotin := fresh_uid_not_in_𝜃 𝛼 _ 𝜃 u freshu big. solve_map_disjoint. }
       have Ha := (untether_preserves_inv 𝛼 _ 𝜃 lc k cells1 c cells2 v u Hisrow freshu big).
-      rewrite insert_insert in Ha. do 2 rewrite insert_union_singleton_l in Ha. apply Ha.
+      rewrite insert_insert_eq in Ha. do 2 rewrite insert_union_singleton_l in Ha. apply Ha.
   Qed.
   
   Lemma upd_delete_cell lc c cv :
@@ -2322,12 +2327,13 @@ Section Cmap.
       unfold "⋅", cmap_op, ra_pt, ra_𝛽. case_bool_decide as Hdisj1.
       - destruct Hdisj1 as [Hdisj1 Hdisjemp].
         rewrite map_disjoint_singleton_l in Hdisj1. rewrite lookup_singleton_None in Hdisj1.
-        rewrite map_empty_union. apply upd_helper_l_𝛽_r_𝛽. intros 𝛼 𝛽 𝜃 Hdisj2 big.
+        assert (∅ ∪ (∅ : unt_map) = ∅) as Heq by apply map_empty_union. rewrite Heq. clear Heq.
+        apply upd_helper_l_𝛽_r_𝛽. intros 𝛼 𝛽 𝜃 Hdisj2 big.
         rewrite <- (insert_union_singleton_l 𝛽). rewrite <- map_union_assoc in big.
         rewrite <- (insert_union_singleton_l 𝛽) in big.
         rewrite <- (insert_union_singleton_l (<[inr c := cv]> 𝛽)) in big.
         assert ((<[lc:=inl c]> (<[inr c:=cv]> 𝛽)) !! lc = Some (inl c)) as Hl
-            by apply lookup_insert.
+            by apply lookup_insert_eq.
         destruct (get_row_for_lc 𝛼 (<[lc := inl c]> (<[inr c := cv]> 𝛽)) 𝜃 lc c Hl big)
             as [k [cells1 [cells2 [v Hisrow]]]].
         exists (𝛼_delete_cell 𝛼 k cells1 cells2 v).
@@ -2336,9 +2342,9 @@ Section Cmap.
         replace (<[lc:=cv]> 𝛽) with 
             (<[ lc := cv ]> (delete (inr c) (<[lc:=inl c]> (<[inr c:=cv]> 𝛽)))).
          + apply delete_cell_preserves_inv; trivial. rewrite lookup_insert_ne; last by done.
-           by rewrite lookup_insert.
+           by rewrite lookup_insert_eq.
          + rewrite delete_insert_ne; last by done.
-           rewrite delete_insert; last by solve_map_disjoint. apply insert_insert.
+           rewrite delete_insert_id; last by solve_map_disjoint. apply insert_insert_eq.
       - rewrite cmra_discrete_total_update. done.
   Qed.
   
@@ -2368,7 +2374,7 @@ Section Cmap.
   Proof.
       unfold ra_pt, ra_𝛽, "⋅", cmap_op. case_bool_decide as Hdisj; last by done.
       intros _ Heq.  subst lc'. destruct Hdisj as [Hdisj _]. 
-      rewrite map_disjoint_spec in Hdisj. apply (Hdisj lc cv cv'); apply lookup_singleton.
+      rewrite map_disjoint_spec in Hdisj. apply (Hdisj lc cv cv'); apply lookup_singleton_eq.
   Qed.
   
   Local Lemma 𝛽sub_of_incl 𝛽' o 𝛽 𝜃 : ra_𝛽 𝛽' ≼ COk o 𝛽 𝜃 → 𝛽' ⊆ 𝛽.
@@ -2466,7 +2472,7 @@ Section Cmap.
       own γ (ra_𝛽 𝛽) ⊢ own γ (ra_pt lc cv) ∗ own γ (ra_𝛽 (delete lc 𝛽)).
   Proof.
       intros Hnone. iIntros "A". iApply (own_ra_𝛽_split).
-        { apply map_disjoint_singleton_l_2. apply lookup_delete. }
+        { apply map_disjoint_singleton_l_2. apply lookup_delete_eq. }
       replace ({[lc := cv]} ∪ delete lc 𝛽) with 𝛽; first by done.
       rewrite union_insert_delete; trivial. rewrite map_empty_union. trivial.
   Qed.
@@ -2491,7 +2497,7 @@ Section Cmap.
   Proof.
     induction cells in lc |- *.
     - iSplit.
-       + iIntros "a". iExists {[ lc := cv ]}. iFrame. iPureIntro. apply lookup_singleton.
+       + iIntros "a". iExists {[ lc := cv ]}. iFrame. iPureIntro. apply lookup_singleton_eq.
        + iDestruct 1 as (𝛽) "[own %Hr]".
          iDestruct (own_ra_𝛽_delete with "own") as "[$ _]". apply Hr.
     - iSplit.
@@ -2527,12 +2533,12 @@ Section Cmap.
           iDestruct (own_ra_𝛽_join with "own0 own1") as "[ownjoin [%sub1 %sub2]]".
           iExists (𝛽 ∪ 𝛽rows). iFrame. iPureIntro. intros l' cells' cv' Hin.
           destruct (decide (l = l')) as [Heq|Hne].
-            * subst l'. rewrite lookup_insert in Hin. inversion Hin. subst cells'. subst cv'.
+            * subst l'. rewrite lookup_insert_eq in Hin. inversion Hin. subst cells'. subst cv'.
               apply (read_𝛽_mono _ _ _ _ _ sub1 Hr).
             * rewrite lookup_insert_ne in Hin; last by trivial.
               apply (read_𝛽_mono _ _ _ _ _ sub2). apply Hreads. apply Hin.
     - iIntros "[%contra|A]". { exfalso.
-        assert (<[l:=row]> rows !! l = Some row) as Hlo by apply lookup_insert.
+        assert (<[l:=row]> rows !! l = Some row) as Hlo by apply lookup_insert_eq.
         rewrite contra in Hlo. rewrite lookup_empty in Hlo. discriminate. }
         iDestruct "A" as (𝛽) "[own %Hreads]". iDestruct (own_valid with "own") as "%Hval".
         destruct (val_to_inv 𝛽 Hval) as [𝛼 [𝜃 Hbig]].
@@ -2542,7 +2548,7 @@ Section Cmap.
               { subst l. rewrite Hnone in Hsome. discriminate. }
               rewrite lookup_insert_ne; trivial. }
         destruct row as [cells cv].
-        assert (read 𝛽 (inl l) cells cv) as Hr. { apply Hreads. apply lookup_insert. }
+        assert (read 𝛽 (inl l) cells cv) as Hr. { apply Hreads. apply lookup_insert_eq. }
         destruct (read_row_cons 𝛼 𝛽 𝜃 rows l cells cv Hbig Hnone Hr Hreads') as
             [𝛽₀ [𝛽₁ [Hunion [Hdisj [Hr2 Hreads2]]]]]. subst 𝛽.
         rewrite big_sepM_insert; last by trivial.
@@ -2810,7 +2816,7 @@ Section Cmap.
           as (𝛼 𝛽' 𝜃) "[[%Hbig [%Hsub1 %Hsub2]] own]".
     rewrite pt_seq_big_sepM_equiv𝛽. iRight. iExists 𝛽'. iFrame "own". iPureIntro.
     intros l' cells' cv'. destruct (decide (l = l')) as [Heq|Hne].
-     - subst l'. intros Hin. rewrite lookup_insert in Hin. inversion Hin. subst cells'. subst cv'.
+     - subst l'. intros Hin. rewrite lookup_insert_eq in Hin. inversion Hin. subst cells'. subst cv'.
        apply (read_𝛽_mono _ _ _ _ _ Hsub1 Hread).
      - intros Hin. rewrite lookup_insert_ne in Hin; last by trivial.
        apply (read_𝛽_mono _ _ _ _ _ Hsub2). apply Hread2. apply Hin.

@@ -4,10 +4,8 @@ From iris.algebra Require Import auth.
 From iris.prelude Require Import options.
 
 From iris.base_logic.lib Require Export own iprop.
-From iris.proofmode Require Import base.
-From iris.proofmode Require Import ltac_tactics.
-From iris.proofmode Require Import tactics.
-From iris.proofmode Require Import coq_tactics.
+From iris.proofmode Require Import base proofmode.
+From iris.proofmode Require Import proofmode.
 
 From stdpp Require Export namespaces.
 
@@ -654,7 +652,7 @@ Section StorageLogic.
       own γ (◯ Inved a) ∗ own γ (◯ Inved b) ⊣⊢ own γ (◯ Inved (a ⋅ b)).
   Proof.
     rewrite <- own_op.
-    replace (◯ Inved a ⋅ ◯ Inved b) with (@auth_frag
+    replace (◯ Inved a ⋅ ◯ Inved b) with (@auth_frag _
           (inved_protocolUR
                           (internal_protocol_mixin_storage_mixin storage_mixin))
           (@Inved P (a ⋅ b))); trivial.
@@ -895,7 +893,7 @@ Section StorageLogic.
         G ∗ sp_own γ p1 ∗ ▷ f b1 ={ E }=∗ G ∗ sp_own γ p2 ∗ ▷ f b2.
   Proof.
     iIntros "x y".
-    iDestruct (sp_exchange_with_extra_guard_nondeterministic p1 q b1 (λ p b, p = p2 ∧ b = b2) γ f G {[ γ ]} with "x y") as "J".
+    iDestruct (sp_exchange_with_extra_guard_nondeterministic p1 q b1 (λ p b, p = p2 ∧ b = b2) γ f G E with "x y") as "J".
     { unfold storage_protocol_exchange_nondeterministic.
       unfold storage_protocol_exchange in exchng.
       intros q0 t1 pi. exists (p2 ⋅ q). exists b2. have ex := exchng q0 t1 pi.
@@ -903,7 +901,7 @@ Section StorageLogic.
       split. { exists p2. split; trivial. split; trivial. }
       apply ex.
     }
-    { set_solver. }
+    { trivial. }
     iMod "J" as (p0 b0) "[[%es %es2] L]". iModIntro. subst p0. subst b0. iFrame.
   Qed.
 
@@ -915,7 +913,7 @@ Section StorageLogic.
         G ∗ sp_own γ p1 ∗ ▷ f b1 ={ E, ∅ }=∗ ▷^n (|={ ∅, E }=> G ∗ sp_own γ p2 ∗ ▷ f b2).
   Proof.
     iIntros "x y".
-    iDestruct (sp_exchange_with_extra_guard_nondeterministic_with_later p1 q b1 (λ p b, p = p2 ∧ b = b2) γ f G {[ γ ]} n with "x y") as "J".
+    iDestruct (sp_exchange_with_extra_guard_nondeterministic_with_later p1 q b1 (λ p b, p = p2 ∧ b = b2) γ f G E n with "x y") as "J".
     { unfold storage_protocol_exchange_nondeterministic.
       unfold storage_protocol_exchange in exchng.
       intros q0 t1 pi. exists (p2 ⋅ q). exists b2. have ex := exchng q0 t1 pi.
@@ -923,7 +921,7 @@ Section StorageLogic.
       split. { exists p2. split; trivial. split; trivial. }
       apply ex.
     }
-    { set_solver. }
+    { trivial. }
     iMod "J" as "J".
     iModIntro.
     iModIntro.
@@ -1121,7 +1119,7 @@ Section StorageLogic.
       (● (Inved p) ⋅ (◯ (Inved ε) ⋅ ◯ (Inved p)))
       (↑ N)
       with "w") as "w".
-    { rewrite coPset_infinite_finite. apply nclose_infinite. }
+    { apply nclose_infinite. }
     { 
       rewrite <- auth_frag_op.
       rewrite auth_both_valid_discrete. split; trivial.

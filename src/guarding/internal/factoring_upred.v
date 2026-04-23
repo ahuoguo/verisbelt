@@ -3,7 +3,7 @@ From iris.algebra Require Export cmra updates.
 From iris.algebra Require Import proofmode_classes functions.
 From iris.base_logic Require Import upred.
 From iris.base_logic.lib Require Export own iprop invariants wsat.
-From iris.proofmode Require Import base ltac_tactics tactics coq_tactics reduction.
+From iris.proofmode Require Import base proofmode reduction.
 From iris.bi Require Import derived_laws.
 
 Section FactoringUpred.
@@ -93,7 +93,7 @@ Proof.
   destruct t11 as [tlatfalse|t11].
   {
     unfold uPred_holds in tlatfalse. unfold upred.uPred_later_def in tlatfalse.
-    unfold uPred_holds in tlatfalse. unfold upred.uPred_pure_def in tlatfalse.
+    unfold uPred_holds, upred.uPred_si_pure_def, siProp_holds, siprop.siProp_pure_def in tlatfalse.
     destruct n; try contradiction.
     unfold uPred_holds, upred.uPred_sep_def. exists ε, x0.
     split.
@@ -258,8 +258,8 @@ Proof.
   { lia. }
   {
     unfold uPred_holds in tlatfalse. unfold upred.uPred_later_def in tlatfalse.
-    unfold uPred_holds in tlatfalse. unfold upred.uPred_pure_def in tlatfalse.
-    
+    unfold uPred_holds, upred.uPred_si_pure_def, siProp_holds, siprop.siProp_pure_def in tlatfalse.
+
     have h : Decision (n = m) by solve_decision. destruct h.
     2: { assert (n - m > 0) as X by lia. destruct (n-m). { lia. } contradiction. }
     subst n.
@@ -296,7 +296,9 @@ Proof.
   
   unfold uPred_holds. unfold upred.uPred_sep_def.
   destruct (cmra_extend (n-m) (x1 ⋅ x2) x z) as (xe&ze&Hx'&Hy1&Hy2); trivial.
-  { apply cmra_validN_le with (n := n); trivial. lia. }
+  { apply (cmra_validN_le n).
+    - exact val_12.
+    - change (n - m ≤ n); lia. }
   
   exists xe. exists ze.
   

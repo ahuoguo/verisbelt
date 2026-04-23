@@ -10,8 +10,6 @@ From iris.prelude Require Import options.
 From iris.base_logic.lib Require Export own iprop.
 From iris.proofmode Require Import base proofmode.
 From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
-From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Export invariants.
 
 (* This is the invariant part of the lifetime logic that's relevant for *full borrows*
@@ -116,7 +114,7 @@ Section FullBorrows.
       split; trivial.
       split. {
         intros sn' bs'. destruct (decide (sn = sn')).
-        + intros Hmbssn'. subst sn'. rewrite lookup_insert in Hmbssn'. inversion Hmbssn'.
+        + intros Hmbssn'. subst sn'. rewrite lookup_insert_eq in Hmbssn'. inversion Hmbssn'.
           split. { set_solver. } split; trivial. split; trivial. set_solver.
         + intros Hmbssn'. rewrite lookup_insert_ne in Hmbssn'; trivial.
           have Hfa := Hf1 sn' bs' Hmbssn'. destruct bs'; trivial. set_solver.
@@ -124,12 +122,12 @@ Section FullBorrows.
       split. {
       intros sn1 bs1 sn2 bs2. destruct (decide (sn = sn1)).
         + subst sn1. intros Hne2 Hmbssn1 Hmbssn2.
-          rewrite lookup_insert in Hmbssn1. rewrite lookup_insert_ne in Hmbssn2; trivial.
+          rewrite lookup_insert_eq in Hmbssn1. rewrite lookup_insert_ne in Hmbssn2; trivial.
           inversion Hmbssn1. destruct bs2 as [|bl2 al2 de2]; trivial.
           subst bs1. have Hfa := Hf1 sn2 (Unborrow bl2 al2 de2) Hmbssn2. set_solver.
         + destruct (decide (sn = sn2)).
         * subst sn2. intros Hne1 Hmbssn1 Hmbssn2.
-          rewrite lookup_insert in Hmbssn2. rewrite lookup_insert_ne in Hmbssn1; trivial.
+          rewrite lookup_insert_eq in Hmbssn2. rewrite lookup_insert_ne in Hmbssn1; trivial.
           inversion Hmbssn2. destruct bs1 as [|bl1 al1 de1]; trivial.
           subst bs2. have Hfa := Hf1 sn1 (Unborrow bl1 al1 de1) Hmbssn1. set_solver.
         * intros Hne Hmbssn1 Hmbssn2.
@@ -156,7 +154,7 @@ Section FullBorrows.
       split; trivial.
       split. {
       intros sn' bs' Hdel. destruct (decide (sn = sn')) as [He|Hn].
-        + subst sn'. rewrite lookup_delete in Hdel. discriminate.
+        + subst sn'. rewrite lookup_delete_eq in Hdel. discriminate.
         + rewrite lookup_delete_ne in Hdel; trivial.
           have Hfa := Hf1 sn' bs'. destruct bs'; intuition.
           have Hf2' := Hf2 _ _ _ _ Hn Hmbssn Hdel. intros x Hxing.
@@ -165,8 +163,8 @@ Section FullBorrows.
       split. {
         intros sn1 bs1 sn2 bs2 Hne Hdel1 Hdel2. 
       
-        destruct (decide (sn = sn1)). { subst sn1. rewrite lookup_delete in Hdel1. discriminate. }
-        destruct (decide (sn = sn2)). { subst sn2. rewrite lookup_delete in Hdel2. discriminate. }
+        destruct (decide (sn = sn1)). { subst sn1. rewrite lookup_delete_eq in Hdel1. discriminate. }
+        destruct (decide (sn = sn2)). { subst sn2. rewrite lookup_delete_eq in Hdel2. discriminate. }
         rewrite lookup_delete_ne in Hdel1; trivial.
         rewrite lookup_delete_ne in Hdel2; trivial.
         apply (Hf2 sn1 bs1 sn2 bs2); trivial.
@@ -188,16 +186,16 @@ Section FullBorrows.
     split; trivial.
     split. {
       intros sn' bs'. destruct (decide (sn = sn')).
-      + subst sn'. intros Hsn. rewrite lookup_insert in Hsn. inversion Hsn. split; trivial.
+      + subst sn'. intros Hsn. rewrite lookup_insert_eq in Hsn. inversion Hsn. split; trivial.
         split; trivial.
       + rewrite lookup_insert_ne; trivial. intros Hsn'.
         apply (Hf1 sn' bs' Hsn').
     }
     split. {
       intros sn1 bs1 sn2 bs2. destruct (decide (sn = sn1)).
-      + subst sn1. intros Hne Hsn1 Hsn2. rewrite lookup_insert in Hsn1. inversion Hsn1. trivial.
+      + subst sn1. intros Hne Hsn1 Hsn2. rewrite lookup_insert_eq in Hsn1. inversion Hsn1. trivial.
       + destruct (decide (sn = sn2)).
-      - subst sn2. intros Hne Hsn1 Hsn2. rewrite lookup_insert in Hsn2. inversion Hsn2. destruct bs1; trivial.
+      - subst sn2. intros Hne Hsn1 Hsn2. rewrite lookup_insert_eq in Hsn2. inversion Hsn2. destruct bs1; trivial.
       - intros Hne Hsn1 Hsn2. 
         rewrite lookup_insert_ne in Hsn1; trivial.
         rewrite lookup_insert_ne in Hsn2; trivial.
@@ -217,15 +215,15 @@ Section FullBorrows.
     split; trivial.
     split. {
       intros sn' bs'. destruct (decide (sn = sn')).
-      + subst sn'. intros Hsn. rewrite lookup_delete in Hsn. discriminate.
+      + subst sn'. intros Hsn. rewrite lookup_delete_eq in Hsn. discriminate.
       + rewrite lookup_delete_ne; trivial. intros Hsn'.
         apply (Hf1 sn' bs' Hsn').
     }
     split. {
       intros sn1 bs1 sn2 bs2. destruct (decide (sn = sn1)).
-      + subst sn1. intros Hne Hsn1 Hsn2. rewrite lookup_delete in Hsn1. discriminate.
+      + subst sn1. intros Hne Hsn1 Hsn2. rewrite lookup_delete_eq in Hsn1. discriminate.
       + destruct (decide (sn = sn2)).
-      - subst sn2. intros Hne Hsn1 Hsn2. rewrite lookup_delete in Hsn2. discriminate.
+      - subst sn2. intros Hne Hsn1 Hsn2. rewrite lookup_delete_eq in Hsn2. discriminate.
       - intros Hne Hsn1 Hsn2. 
         rewrite lookup_delete_ne in Hsn1; trivial.
         rewrite lookup_delete_ne in Hsn2; trivial.
@@ -461,7 +459,7 @@ Section FullBorrows.
   Proof.
     intros Hmbs. unfold borrow_sum. rewrite big_sepM_insert; trivial. iIntros "[H J]".
     iSplitL "H".
-    - destruct (f bs) eqn:Hfbs; last by trivial. rewrite lookup_insert. iFrame.
+    - destruct (f bs) eqn:Hfbs; last by trivial. rewrite lookup_insert_eq. iFrame.
     - iApply big_sepM_mono; last by iFrame "J". intros sn' bs' Hsn'. simpl.
       rewrite lookup_insert_ne; first by trivial. intros Heq. subst sn'.
       rewrite Hmbs in Hsn'. discriminate.
@@ -480,7 +478,7 @@ Section FullBorrows.
       destruct (mprops !! sn); trivial. iRewrite "Eq". iFrame.
     - iApply big_sepM_mono; last by iFrame "H". intros sn' bs' Hsn'. simpl.
       rewrite lookup_delete_ne; first by trivial. intros Heq. subst sn'.
-      rewrite lookup_delete in Hsn'. discriminate.
+      rewrite lookup_delete_eq in Hsn'. discriminate.
   Qed.
   
   Lemma borrow_sum_insert_2 (f : BorState → bool) sn bs P mbs mprops :
@@ -490,7 +488,7 @@ Section FullBorrows.
   Proof.
     intros Hmbs. unfold borrow_sum. rewrite big_sepM_insert; trivial. iIntros "[H J]".
     iSplitL "H".
-    - destruct (f bs) eqn:Hfbs; last by trivial. rewrite lookup_insert. iFrame.
+    - destruct (f bs) eqn:Hfbs; last by trivial. rewrite lookup_insert_eq. iFrame.
     - iApply big_sepM_mono; last by iFrame "J". intros sn' bs' Hsn'. simpl.
       rewrite lookup_insert_ne; first by trivial. intros Heq. subst sn'.
       rewrite Hmbs in Hsn'. discriminate.
@@ -507,7 +505,7 @@ Section FullBorrows.
     iIntros "[#Eq [H P]]". iSplitL "P".
     - iNext. iApply big_sepM_mono; last by iFrame "P". intros sn' bs' Hsn'. simpl.
       rewrite lookup_delete_ne; first by trivial. intros Heq. subst sn'.
-      rewrite lookup_delete in Hsn'. discriminate.
+      rewrite lookup_delete_eq in Hsn'. discriminate.
     - iNext. destruct (f bs) eqn:Hfbs; last by trivial. rewrite option_equivI.
       destruct (mprops !! sn); trivial. iRewrite "Eq" in "H". iFrame.
   Qed.
@@ -521,7 +519,7 @@ Section FullBorrows.
     iIntros "[H P]".
     iNext. iApply big_sepM_mono; last by iFrame "P". intros sn' bs' Hsn'. simpl.
     rewrite lookup_delete_ne; first by trivial. intros Heq. subst sn'.
-    rewrite lookup_delete in Hsn'. discriminate.
+    rewrite lookup_delete_eq in Hsn'. discriminate.
   Qed.
   
   Lemma full_borrows_invalidated_via_insert alive dead k sn mbs mprops bs P :
@@ -630,11 +628,11 @@ Section FullBorrows.
     iIntros "[inval #Heq]".
     destruct (invalidated alive dead k bs) eqn:Hcmp.
     - iDestruct (full_borrows_invalidated_via_insert alive dead k sn (delete sn mbs) (delete sn mprops) _ P with "[inval]") as "[p inval]".
-      { rewrite lookup_delete. trivial. } { apply Himpl. trivial. } { iFrame "inval". }
+      { rewrite lookup_delete_eq. trivial. } { apply Himpl. trivial. } { iFrame "inval". }
       iDestruct (full_borrows_invalidated_via_delete with "[inval p]") as "inval".
       { apply Hmbssn. } { iFrame "Heq". iFrame "inval". iFrame "p". } iFrame.
     - iDestruct (full_borrows_invalidated_via_insert_false alive dead k sn (delete sn mbs) (delete sn mprops) _ P with "[inval]") as "inval".
-      { apply lookup_delete. } { iFrame. }
+      { apply lookup_delete_eq. } { iFrame. }
       iDestruct (full_borrows_invalidated_via_delete_false with "[inval]") as "inval".
       { apply Hmbssn. } { apply Hcmp. } { iFrame "inval". } iFrame.
   Qed.
@@ -671,7 +669,7 @@ Section FullBorrows.
       delete sn1 mbs !! sn2 = None.
   Proof.
       intros Hdel. destruct (decide (sn1 = sn2)).
-      - subst sn2. rewrite lookup_delete. trivial.
+      - subst sn2. rewrite lookup_delete_eq. trivial.
       - unfold boxmap in Hdel. rewrite lookup_delete_ne in Hdel; trivial.
         rewrite lookup_fmap in Hdel. rewrite lookup_delete_ne; trivial.
         destruct (mbs !! sn2) eqn:Hmbs; rewrite Hmbs; trivial. rewrite Hmbs in Hdel.
@@ -684,10 +682,10 @@ Section FullBorrows.
   Proof.
       destruct (<[sn:=bs]> (delete sn' mbs) !! sn2) eqn:Heq; trivial.
       intros Ha. exfalso. unfold boxmap in Ha. destruct (decide (sn = sn2)).
-      - subst sn2. rewrite lookup_insert in Ha. discriminate.
+      - subst sn2. rewrite lookup_insert_eq in Ha. discriminate.
       - rewrite lookup_insert_ne in Ha; trivial.
         rewrite lookup_insert_ne in Heq; trivial. destruct (decide (sn' = sn2)).
-          + subst sn2. rewrite lookup_delete in Heq. discriminate.
+          + subst sn2. rewrite lookup_delete_eq in Heq. discriminate.
           + rewrite lookup_delete_ne in Ha; trivial.
             rewrite lookup_delete_ne in Heq; trivial.
             rewrite lookup_fmap in Ha. rewrite Heq in Ha. discriminate.
@@ -698,11 +696,11 @@ Section FullBorrows.
       (delete sn' mbs) !! sn2 = None.
   Proof.
       intros Ha. destruct (decide (sn2 = sn')).
-      - subst sn'. apply lookup_delete.
+      - subst sn'. apply lookup_delete_eq.
       - destruct (decide (sn = sn2)).
-        + subst sn2. rewrite lookup_insert in Ha. discriminate.
+        + subst sn2. rewrite lookup_insert_eq in Ha. discriminate.
         + rewrite lookup_insert_ne in Ha; trivial. destruct (decide (sn' = sn2)); trivial.
-          * subst sn'. rewrite lookup_delete; trivial.
+          * subst sn'. rewrite lookup_delete_eq; trivial.
           * rewrite lookup_delete_ne in Ha; trivial. rewrite lookup_delete_ne; trivial.
             unfold boxmap in Ha. rewrite lookup_fmap in Ha.
             destruct (mbs !! sn2) eqn:Heq; trivial. exfalso. rewrite Heq in Ha. discriminate.
@@ -713,7 +711,7 @@ Section FullBorrows.
     mbs !! sn2 = None ∧ sn ≠ sn2.
   Proof.
     intros Ha. assert (sn ≠ sn2) as Hne.
-        { intros Heq. subst sn2. rewrite lookup_insert in Ha. discriminate. }
+        { intros Heq. subst sn2. rewrite lookup_insert_eq in Ha. discriminate. }
     split; trivial. rewrite lookup_insert_ne in Ha; trivial.
     unfold boxmap in Ha. rewrite lookup_fmap in Ha.
     destruct (mbs !! sn2) eqn:Heq; trivial. exfalso. rewrite Heq in Ha. discriminate.
@@ -724,10 +722,10 @@ Section FullBorrows.
     delete sn2 (delete sn1 mbs) !! sn = None.
   Proof.
     intro Hx.
-    destruct (decide (sn2 = sn)). { subst sn2. rewrite lookup_delete. trivial. }
+    destruct (decide (sn2 = sn)). { subst sn2. rewrite lookup_delete_eq. trivial. }
     rewrite lookup_delete_ne; trivial.
     rewrite lookup_delete_ne in Hx; trivial.
-    destruct (decide (sn1 = sn)). { subst sn1. rewrite lookup_delete. trivial. }
+    destruct (decide (sn1 = sn)). { subst sn1. rewrite lookup_delete_eq. trivial. }
     rewrite lookup_delete_ne; trivial.
     rewrite lookup_delete_ne in Hx; trivial.
     unfold boxmap in Hx. rewrite lookup_fmap in Hx.

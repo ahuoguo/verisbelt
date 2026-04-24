@@ -30,7 +30,7 @@ Proof. solve_inG. Qed.
 
 Definition lrust_adequacy Σ `{!lrustGpreS Σ} e φ k :
   (∀ `{!lrustGS Σ}, £k -∗ time_ctx -∗ WP e {{ v, ⌜φ v⌝ }}) →
-  adequate NotStuck e (∅,false) (λ v _, φ v).
+  adequate NotStuck e ∅ (λ v _, φ v).
 Proof.
   intros Hwp. apply adequate_alt. intros t2 σ2 [n [κs ?]]%erased_steps_nsteps.
   (* use a variant that lets us start at step 1 with some later credits *)

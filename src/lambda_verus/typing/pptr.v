@@ -202,6 +202,7 @@ Section typing.
     iIntros (? ->).
     iApply (wp_persistent_time_receipt with "TIME Hd"); [done|].
     iIntros "£ #Hd'".
+    iDestruct (lc_weaken 1 with "£") as "£1"; first (rewrite /advance_credits; lia).
     wp_rec.
     wp_bind (new _).
     iApply wp_new => //.
@@ -210,7 +211,7 @@ Section typing.
     wp_let.
     rewrite heap_mapsto_vec_singleton.
     wp_bind (_ <- _)%E.
-    iApply (wp_write_na with "Hl'"); [solve_ndisj|].
+    iApply (wp_write_na with "[$Hl' $£1]"); [solve_ndisj|].
     iNext. iIntros "Hl'". wp_seq.
     iExists -[(l', (l, (l, x)))].
     iFrame.

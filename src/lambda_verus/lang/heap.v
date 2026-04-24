@@ -33,7 +33,7 @@ Class heapGS Σ := HeapGS {
 
 Definition heap_freeable_rel (σ : state) (hF : heap_freeableUR) : Prop :=
   ∀ blk qs, hF !! blk = Some qs →
-    qs.2 ≠ ∅ ∧ ∀ i, is_Some (σ.1 !! (blk, i)) ↔ is_Some (qs.2 !! i).
+    qs.2 ≠ ∅ ∧ ∀ i, is_Some (σ !! (blk, i)) ↔ is_Some (qs.2 !! i).
 
 Section definitions.
   Context `{!heapGS Σ}.
@@ -65,10 +65,10 @@ Section definitions.
       na_invariants_fork.na_own atomic_threadpool ⊤ ∗ atomic_lock_ctr atomic_lock_ctr_name 0 ⊤.
 
   Definition heap_ctx (σ:state) : iProp Σ :=
-    (∃ hF, non_atomic_map heap_name σ.1
+    (∃ hF, non_atomic_map heap_name σ
          ∗ own heap_freeable_name (● hF)
          ∗ ⌜heap_freeable_rel σ hF⌝
-         ∗ (match σ.2 with true => True | false => heap_ato_ctx end))%I.
+         ∗ heap_ato_ctx)%I.
          
   Definition cell_id := positive.
   
@@ -417,7 +417,7 @@ Section heap.
 
   (** Properties about heap_freeable_rel and heap_freeable *)
   Lemma heap_freeable_rel_None σ l hF :
-    (∀ m : Z, σ.1 !! (l +ₗ m) = None) → heap_freeable_rel σ hF →
+    (∀ m : Z, σ !! (l +ₗ m) = None) → heap_freeable_rel σ hF →
     hF !! l.1 = None.
   Proof.
     intros FRESH REL. apply eq_None_not_Some. intros [[q s] [Hsne REL']%REL].
@@ -428,7 +428,7 @@ Section heap.
   Lemma heap_freeable_is_Some σ hF l n i :
     heap_freeable_rel σ hF →
     hF !! l.1 = Some (1%Qp, inter (l.2) n) →
-    is_Some (σ.1 !! (l +ₗ i)) ↔ 0 ≤ i ∧ i < n.
+    is_Some (σ !! (l +ₗ i)) ↔ 0 ≤ i ∧ i < n.
   Proof.
     destruct l as [b j]; rewrite /shift_loc /=. intros REL Hl.
     destruct (REL b (1%Qp, inter j n)) as [_ ->]; simpl in *; auto.
@@ -439,9 +439,9 @@ Section heap.
 
   Lemma heap_freeable_rel_init_mem l h n σ:
     n ≠ O →
-    (∀ m : Z, σ.1 !! (l +ₗ m) = None) →
+    (∀ m : Z, σ !! (l +ₗ m) = None) →
     heap_freeable_rel σ h →
-    heap_freeable_rel (init_mem l n $σ σ)
+    heap_freeable_rel (init_mem l n σ)
                       (<[l.1 := (1%Qp, inter (l.2) n)]> h).
   Proof.
     move=> Hvlnil FRESH REL blk qs /lookup_insert_Some [[<- <-]|[??]].
@@ -459,7 +459,7 @@ Section heap.
   Lemma heap_freeable_rel_free_mem σ hF n l :
     hF !! l.1 = Some (1%Qp, inter (l.2) n) →
     heap_freeable_rel σ hF →
-    heap_freeable_rel (free_mem l n $σ σ) (delete (l.1) hF).
+    heap_freeable_rel (free_mem l n σ) (delete (l.1) hF).
   Proof.
     intros Hl REL b qs; rewrite lookup_delete_Some=> -[NEQ ?].
     destruct (REL b qs) as [? REL']; auto.
@@ -467,8 +467,8 @@ Section heap.
   Qed.
 
   Lemma heap_freeable_rel_stable σ h l p :
-    heap_freeable_rel σ h → is_Some (σ.1 !! l) →
-    heap_freeable_rel (<[l := p]>σ.1, σ.2) h.
+    heap_freeable_rel σ h → is_Some (σ !! l) →
+    heap_freeable_rel (<[l := p]>σ) h.
   Proof.
     intros REL Hσ blk qs Hqs. destruct (REL blk qs) as [? REL']; first done.
     split; [done|]=> i. rewrite -REL' lookup_insert_is_Some.
@@ -476,16 +476,16 @@ Section heap.
   Qed.
   
   Lemma lookup_init_mem_prev l n σ :
-      init_mem (l +ₗ 1) n σ.1 !! l = σ.1 !! l.
+      init_mem (l +ₗ 1) n σ !! l = σ !! l.
   Proof.
       rewrite lookup_init_mem_ne /=; first by done. right. left. lia.
   Qed.
 
   (** Weakest precondition *)
   Lemma heap_alloc_vs σ l n :
-    (∀ m : Z, σ.1 !! (l +ₗ m) = None) →
-    non_atomic_map heap_name (σ.1) ⊢
-    |==> non_atomic_map heap_name ((init_mem l n σ.1))
+    (∀ m : Z, σ !! (l +ₗ m) = None) →
+    non_atomic_map heap_name (σ) ⊢
+    |==> non_atomic_map heap_name ((init_mem l n σ))
        ∗ l ↦∗ (repeat (LitV LitPoison) n).
   Proof.
     generalize l. clear l. induction n.
@@ -502,9 +502,9 @@ Section heap.
 
   Lemma heap_alloc (σ: state) l n :
     0 < n →
-    (∀ m, σ.1 !! (l +ₗ m) = None) →
+    (∀ m, σ !! (l +ₗ m) = None) →
     heap_ctx σ ==∗
-      heap_ctx (init_mem l (Z.to_nat n) $σ σ) ∗ †l…(Z.to_nat n) ∗
+      heap_ctx (init_mem l (Z.to_nat n) σ) ∗ †l…(Z.to_nat n) ∗
       l ↦∗ repeat (LitV LitPoison) (Z.to_nat n).
   Proof.
     intros ??; iDestruct 1 as (hF) "(Hvalσ & HhF & % & ato)".
@@ -523,8 +523,8 @@ Section heap.
 
   Lemma heap_free_vs σ l vl E :
     ↑naN ⊆ E →
-    non_atomic_map heap_name σ.1 ∗ l ↦∗ vl
-    ⊢ |={E}=> non_atomic_map heap_name (free_mem l (length vl) σ.1).
+    non_atomic_map heap_name σ ∗ l ↦∗ vl
+    ⊢ |={E}=> non_atomic_map heap_name (free_mem l (length vl) σ).
   Proof.
       intros Hmask. generalize l. clear l. induction vl.
      - iIntros (l) "[σ pt]". iFrame. iModIntro. by rewrite /heap_mapsto_vec.
@@ -543,8 +543,8 @@ Section heap.
     ↑naN ⊆ E →
     n = length vl →
     heap_ctx σ -∗ l ↦∗ vl -∗ †l…(length vl)
-    ={E}=∗ ⌜0 < n⌝ ∗ ⌜∀ m, is_Some (σ.1 !! (l +ₗ m)) ↔ (0 ≤ m < n)⌝ ∗
-        heap_ctx (free_mem l (Z.to_nat n) $σ σ).
+    ={E}=∗ ⌜0 < n⌝ ∗ ⌜∀ m, is_Some (σ !! (l +ₗ m)) ↔ (0 ≤ m < n)⌝ ∗
+        heap_ctx (free_mem l (Z.to_nat n) σ).
   Proof.
     iDestruct 1 as (hF) "(Hvalσ & HhF & REL & ato)"; iDestruct "REL" as %REL.
     iIntros "Hmt Hf". rewrite heap_freeable_eq /heap_freeable_def.
@@ -618,7 +618,7 @@ Section heap.
   Lemma heap_read σ l cells v E :
     ↑naN ⊆ E →
     heap_ctx σ -∗ l ↦[^ cells] v ={E}=∗
-    heap_ctx σ ∗ l ↦[^ cells] v ∗ ∃ n, ⌜σ.1 !! l = Some (RSt n, v)⌝.
+    heap_ctx σ ∗ l ↦[^ cells] v ∗ ∃ n, ⌜σ !! l = Some (RSt n, v)⌝.
   Proof.
     iDestruct 1 as (hF) "(Hσ & HhF & REL)". iIntros "Hmt".
     iMod (lc_zero) as "£0".
@@ -1614,8 +1614,8 @@ Section heap.
     ↑naN ⊆ E →
     £(3*d+1) -∗
     heap_ctx σ -∗ (G &&{↑naN;d}&&> l #↦_) -∗ G -∗ l #↦ v ={E}=∗
-      ⌜σ.1 !! l.1 = Some (RSt 0, v)⌝ ∗
-    heap_ctx (<[l.1 := (RSt 0, v')]> σ.1, σ.2) ∗ G ∗ l #↦ v'.
+      ⌜σ !! l.1 = Some (RSt 0, v)⌝ ∗
+    heap_ctx (<[l.1 := (RSt 0, v')]> σ) ∗ G ∗ l #↦ v'.
   Proof.
     iIntros (Hmask) "[£ £1] ctx #guards G pt". iDestruct "ctx" as (hF) "(Hσ & HhF & % & ato)".
     unfold heap_complete_mapsto, heap_complete_mapsto_fancy.
@@ -1632,10 +1632,10 @@ Section heap.
     ↑naN ⊆ E →
     £(3*d) -∗
     heap_ctx σ -∗ (G &&{↑naN;d}&&> l #↦_) -∗ G -∗ l #↦ v ={E}=∗
-      ⌜σ.1 !! l.1 = Some (RSt 0, v)⌝ ∗
-      heap_ctx (<[l.1:=(WSt, v)]> σ.1, σ.2) ∗
-      ∀ σ', £1 -∗ heap_ctx σ' ={E}=∗ ⌜∃v0, σ'.1 !! l.1 = Some (WSt, v0)⌝ ∗
-        heap_ctx (<[l.1:=(RSt 0, v')]> σ'.1, σ'.2) ∗ G ∗ l #↦ v'.
+      ⌜σ !! l.1 = Some (RSt 0, v)⌝ ∗
+      heap_ctx (<[l.1:=(WSt, v)]> σ) ∗
+      ∀ σ', £1 -∗ heap_ctx σ' ={E}=∗ ⌜∃v0, σ' !! l.1 = Some (WSt, v0)⌝ ∗
+        heap_ctx (<[l.1:=(RSt 0, v')]> σ') ∗ G ∗ l #↦ v'.
   Proof.
     iIntros (Hmask) "£ ctx #guards G pt". iDestruct "ctx" as (hF) "(Hσ & HhF & % & ato)".
     unfold heap_complete_mapsto, heap_complete_mapsto_fancy.

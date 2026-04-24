@@ -140,17 +140,16 @@ Proof.
   iNext. by iIntros.
 Qed.
 
-Lemma tac_wp_read K Δ Δ' E i l v o Φ :
+Lemma tac_wp_read K Δ Δ' E i l v Φ :
   ↑naN ⊆ E →
-  o = Na1Ord ∨ o = ScOrd →
   MaybeIntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, l ↦ v)%I →
   envs_entails Δ' (WP fill K (of_val v) @ E {{ Φ }}) →
-  envs_entails Δ (WP fill K (Read o (Lit $ LitLoc l)) @ E {{ Φ }}).
+  envs_entails Δ (WP fill K (Read (Lit $ LitLoc l)) @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal. intros Hmask eq ?? HΔ. rewrite -wp_bind.
+  rewrite envs_entails_unseal. intros Hmask ?? HΔ. rewrite -wp_bind.
   rewrite into_laterN_env_sound envs_lookup_split //= HΔ. iIntros "[↦ →wp]".
-  case: eq=> ->; by [iApply (wp_read_na with "↦")|iApply (wp_read_sc with "↦")].
+  by iApply (wp_read_na with "↦").
 Qed.
 
 (*
@@ -165,21 +164,27 @@ Proof.
   rewrite envs_entails_unseal; intros [->| ->] ???.
 *)
 
-Lemma tac_wp_write K Δ Δ' Δ'' E i l v e v' o Φ :
+(* After the concurrency strip, a single-step write requires an extra £1 credit.
+   We look up the credit in Δ (before MaybeIntoLaterN wraps everything in ▷)
+   so the credit stays bare — WP's later only wraps the mapsto. *)
+Lemma tac_wp_write K Δ Δ' Δ'' E i j l v e v' Φ :
   IntoVal e v' → ↑non_atomic_cell_map.naN ⊆ E →
-  o = Na1Ord (* ∨ o = ScOrd *)  →
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v)%I →
-  (* We probably need the assumption below but it seems wrong *)
-  (* (if decide (o = ScOrd) then exists i', envs_lookup i' Δ' = Some (false, £1) else True) → *)
+  envs_lookup j Δ = Some (false, £1)%I →
+  MaybeIntoLaterNEnvs 1 (envs_delete true j false Δ) Δ' →
+  envs_lookup i Δ' = Some (false, (l ↦ v)%I) →
   envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' = Some Δ'' →
   envs_entails Δ'' (WP fill K (Lit LitPoison) @ E {{ Φ }}) →
-  envs_entails Δ (WP fill K (Write o (Lit $ LitLoc l) e) @ E {{ Φ }}).
+  envs_entails Δ (WP fill K (Write (Lit $ LitLoc l) e) @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal; intros ?? -> ??? HΔ. rewrite -wp_bind.
-  rewrite into_laterN_env_sound envs_simple_replace_sound // /= HΔ sep_emp.
-  iIntros "[↦ →wp]".
-  by iApply (wp_write_na with "↦").
+  rewrite envs_entails_unseal; intros ?? Hj ? Hi Hsimpl HΦ. rewrite -wp_bind.
+  rewrite (envs_lookup_sound _ j false) //=.
+  rewrite into_laterN_env_sound.
+  rewrite (envs_simple_replace_sound _ _ i) //=.
+  rewrite HΦ. simpl.
+  iIntros "[£ Hlater]".
+  iDestruct "Hlater" as "(↦ & Henv)".
+  iApply (wp_write_na with "[$↦ $£]"); [done|].
+  iNext; iIntros "↦". iApply "Henv". iFrame.
 Qed.
 End heap.
 
@@ -262,9 +267,7 @@ Tactic Notation "wp_read" :=
     first
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_read K)) => //
       |fail 1 "wp_read: cannot find 'Read' in" e];
-    [(right; fast_done) || (left; fast_done) ||
-     fail "wp_read: order is neither Na2Ord nor ScOrd"
-    |tc_solve
+    [tc_solve
     |let l := match goal with |- _ = Some (_, (?l ↦ _)%I) => l end in
      iAssumptionCore || fail "wp_read: cannot find" l "↦ ?"
     |simpl; try wp_value_head]
@@ -300,8 +303,7 @@ Tactic Notation "wp_write" :=
       [reshape_expr e ltac:(fun K e' => eapply (tac_wp_write K); [tc_solve|..])
       |fail 1 "wp_write: cannot find 'Write' in" e];
     [try fast_done
-    |(right; fast_done) || (left; fast_done) ||
-     fail "wp_write: order is neither Na1Ord nor ScOrd"
+    |iAssumptionCore || fail "wp_write: cannot find a £ 1 hypothesis"
     |tc_solve
     |let l := match goal with |- _ = Some (_, (?l ↦ _)%I) => l end in
      iAssumptionCore || fail "wp_write: cannot find" l "↦ ?"

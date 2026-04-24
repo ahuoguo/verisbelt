@@ -57,7 +57,7 @@ Lemma wp_memcpy_guarded `{!lrustGS Σ} E l1 l2 vl1 vl2 Hw Hr (n : Z) d :
       (Hw &&{↑naN; d}&&> l1 #↦∗_) ∗
       (Hr &&{↑naN; d}&&> (l2.1 ↦[^ l2.2]∗ vl2))
       ∗ Hw ∗ Hr
-      ∗ ⧖d ∗ £(6*d) }}}
+      ∗ ⧖d ∗ £(6*d+1) }}}
     #(l1.1) <-{n} !#(l2.1) @ E
   {{{ RET #☠; l1 #↦∗ vl2 ∗ Hw ∗ Hr }}}.
 Proof.
@@ -69,36 +69,36 @@ Proof.
   - destruct vl1 as [|v1 vl1], vl2 as [|v2 vl2], n as [|n|]; try (discriminate || lia).
     revert Hvl1 Hvl2. intros [= Hvl1] [= Hvl2]. subst n.
     iDestruct "⧖" as "#⧖".
-    
+
     destruct l1 as [l1 cells1]. destruct cells1; first by done.
     rewrite heap_mapsto_cloc_vals_vec_cons.
-    iDestruct "Hl1" as "[Hv1 Hl1]". 
+    iDestruct "Hl1" as "[Hv1 Hl1]".
     rewrite heap_mapsto_cloc_emp_cons.
-    
+
     destruct l2 as [l2 cells2]. destruct cells2.
       { iApply fupd_wp. leaf_open_laters "rguard" with "Hr" as "R"; first by set_solver.
         iDestruct "£" as "[£d £]".
-        iMod (lc_fupd_elim_laterN with "£d R") as "R".
+        iMod (lc_fupd_elim_laterN with "[£d] R") as "R"; first by iApply (lc_weaken with "£d"); lia.
         iMod "R" as "[R back]". done.
       }
     simpl. rewrite heap_mapsto_cells_val_vec_cons.
-    
+
     iDestruct (guards_weaken_rhs_sep_l with "wguard") as "#wguard1".
     iDestruct (guards_weaken_rhs_sep_r with "wguard") as "#wguard2".
     iDestruct (guards_weaken_rhs_sep_l with "rguard") as "#rguard1".
     iDestruct (guards_weaken_rhs_sep_r with "rguard") as "#rguard2".
-    
-    iAssert (£(3*d + 3*d))%I with "[£]" as "[£1 £2]". { iApply (lc_weaken with "£"). lia. }
-    
+
+    iAssert (£(3*d + (3*d + 1)))%I with "[£]" as "[£1 £2]". { iApply (lc_weaken with "£"). lia. }
+
     wp_bind (!#l2)%E. iApply (wp_read_na_guarded_cells with "[Hr £1]"); first by set_solver.
       { iFrame "rguard1". iFrame. }
     iNext. iIntros "Hr".
     wp_bind (#l1 <- v2)%E.
     iApply (wp_write_na_guarded_more_credits with "TIME [Hw Hv1 £2]"); first by set_solver.
       { iFrame "wguard1". iFrame. iFrame "⧖". }
-    
+
     iNext. iIntros "[Hv2 [Hw £]]".
-    
+
     wp_seq. do 3 wp_op.
     iApply ("IH" $! (Z.pos (Pos.of_succ_nat (length vl1)) - 1)%Z (l1 +ₗ 1, cells1) (l2 +ₗ 1, cells2) with "[%] [%] Hl1 wguard2 rguard2 Hw Hr ⧖ £"); [lia..|].
     iIntros "!> [Hl1 Hl2]"; iApply "HΦ"; by iFrame.

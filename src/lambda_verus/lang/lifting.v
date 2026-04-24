@@ -412,7 +412,7 @@ Qed.
 
 Lemma wp_read_sc_guarded_cells E l c v d G :
   ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> l ↦[^ c] v) ∗ G ∗ £(d) }}} Read ScOrd (Lit $ LitLoc l) @ E {{{ RET v; G }}}.
+  {{{ (G &&{↑naN; d}&&> l ↦[^ c] v) ∗ G ∗ £(d) }}} Read (Lit $ LitLoc l) @ E {{{ RET v; G }}}.
 Proof.
   iIntros (Hmask Φ) "[#Gv [G £]] HΦ". iApply wp_lift_base_step; auto.
   iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hσ & HhF & %REL & ato)".
@@ -429,7 +429,7 @@ Qed.
 
 Lemma wp_read_sc E l v :
   ↑naN ⊆ E →
-  {{{ ▷ l ↦ v }}} Read ScOrd (Lit $ LitLoc l) @ E
+  {{{ ▷ l ↦ v }}} Read (Lit $ LitLoc l) @ E
   {{{ RET v; l ↦ v }}}.
 Proof.
   iIntros (Hmask Φ) ">pt ToΦ".
@@ -442,38 +442,28 @@ Qed.
 
 Lemma wp_read_na_guarded_cells E l c G v d :
   ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> (l ↦[^ c] v)) ∗ G ∗ £(3*d) }}} Read Na1Ord (Lit $ LitLoc l) @ E
+  {{{ (G &&{↑naN; d}&&> (l ↦[^ c] v)) ∗ G ∗ £(3*d) }}} Read (Lit $ LitLoc l) @ E
   {{{ RET v; G }}}.
 Proof.
   iIntros (Hmask Φ) "[#Gv [G £]] HΦ". iApply wp_lift_base_step; auto.
   iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hσ & HhF & %REL & ato)".
-  iMod (na_read_begin with "£ [Gv] G Hσ") as (n0) "[%Heq [rim Hσ]]". { trivial. } { rewrite /heap_mapsto_cells_fancy. unfold fv2sum. iFrame "Gv". } replace (n0 + 1)%nat with (S n0) by lia.
-  iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit. 
-    { iExists _, _, _, _. iPureIntro. apply ReadNa1S. apply Heq. }
+  iDestruct (lc_weaken d with "£") as "£"; first lia.
+  iMod (atomic_read with "£ [Gv] G Hσ") as (n0) "[%Heq [rim Hσ]]". { trivial. }
+  { rewrite /heap_mapsto_cells_fancy. unfold fv2sum. iFrame "Gv". }
+  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+  iSplit. { iPureIntro. eexists _, _, _, _. eapply ReadS; eauto. }
   iNext; iIntros (e2 σ2 efs Hstep); inv_head_step. iMod "Hclose" as "_".
   iMod (time_interp_step with "Ht") as "$". iIntros "credit !>". iFrame.
   iSplit. { iPureIntro. eauto using heap_freeable_rel_stable. }
   iSplit; last done.
-  clear dependent σ1 n. iApply wp_lift_atomic_base_step_no_fork; auto.
-  iIntros (σ1 stepcnt' κ' κs' n') "[Hσ Ht]".
-  iMod (time_interp_step with "Ht") as "$".
-  iDestruct "Hσ" as (hF') "(Hσ & HhF & %REL & ato)".
-  iDestruct (na_read_end with "rim Hσ") as "A". { apply Hmask. }
-  iMod (lc_fupd_elim_later with "credit A") as "A". iMod "A" as (n) "([%H1 %H2] & G & Hσ)".
-  destruct n as [|n]; first by lia. replace (S n - 1)%nat with n by lia.
-  iModIntro; iSplit.
-    { iExists _, _, _, _. iPureIntro. apply ReadNa2S. eauto. }
-  iNext. iIntros (e2 σ2 efs Hstep) "credit2 !>"; inv_head_step.
-  iFrame.
-  iSplit; [done|].
-  iSplit. { iPureIntro. eauto using heap_freeable_rel_stable. }
-  iApply "HΦ". iFrame "G".
+  iApply wp_value.
+  iApply ("HΦ" with "rim").
 Qed.
 
 (* Heap-Read *)
 Lemma wp_read_na_guarded_cells_0 E l c G v :
   ↑naN ⊆ E →
-  {{{ (G &&{↑naN}&&> (l ↦[^ c] v)) ∗ G }}} Read Na1Ord (Lit $ LitLoc l) @ E
+  {{{ (G &&{↑naN}&&> (l ↦[^ c] v)) ∗ G }}} Read (Lit $ LitLoc l) @ E
   {{{ RET v; G }}}.
 Proof.
   iIntros (Hmask 𝛷) "[g G]". iMod (lc_zero) as "£0".
@@ -482,7 +472,7 @@ Qed.
 
 Lemma wp_read_na E l v :
   ↑naN ⊆ E →
-  {{{ ▷ l ↦ v }}} Read Na1Ord (Lit $ LitLoc l) @ E
+  {{{ ▷ l ↦ v }}} Read (Lit $ LitLoc l) @ E
   {{{ RET v; l ↦ v }}}.
 Proof.
   iIntros (Hmask Φ) ">pt ToΦ".
@@ -493,7 +483,7 @@ Qed.
 
 Lemma wp_read_na_guarded_cells_singleton E l c G v d :
   ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> (l ↦[^ c]∗ [v])) ∗ G ∗ £(3*d) }}} Read Na1Ord (Lit $ LitLoc l) @ E
+  {{{ (G &&{↑naN; d}&&> (l ↦[^ c]∗ [v])) ∗ G ∗ £(3*d) }}} Read (Lit $ LitLoc l) @ E
   {{{ RET v; G }}}.
 Proof.
   case: c=> >; last first.
@@ -506,7 +496,7 @@ Qed.
 
 Lemma wp_read_na_guarded E l G v d :
   ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> (l ↦ v)) ∗ G ∗ £(3*d) }}} Read Na1Ord (Lit $ LitLoc l) @ E
+  {{{ (G &&{↑naN; d}&&> (l ↦ v)) ∗ G ∗ £(3*d) }}} Read (Lit $ LitLoc l) @ E
   {{{ RET v; G }}}.
 Proof.
   intros Hmask. have Ha := wp_read_na_guarded_cells_singleton E l [[]] G v d. simpl in Ha.
@@ -520,14 +510,14 @@ Qed.
 Lemma wp_write_sc_guarded E l c e v v' d G :
   ↑naN ⊆ E →
   IntoVal e v →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) }}} Write ScOrd (Lit $ LitLoc l) e @ E
+  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) }}} Write (Lit $ LitLoc l) e @ E
   {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G }}}.
 Proof.
   iIntros (Hmask <- Φ) "[#guards [G [Hv £]]] HΦ".
   iApply wp_lift_base_step; auto. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
   iMod (heap_write with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by trivial.
   iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose".
-    iSplit. { iPureIntro. eexists _, _, _, _. eapply WriteScS; eauto. }
+    iSplit. { iPureIntro. eexists _, _, _, _. eapply WriteS; eauto. }
   iNext; iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step. iMod "Hclose" as "_".
   iMod (time_interp_step with "Ht") as "$". iModIntro. iFrame "Hσ". iSplit; last done.
   clear dependent σ1.
@@ -539,7 +529,7 @@ Qed.
 Lemma wp_write_sc E l e v v' :
   ↑naN ⊆ E →
   IntoVal e v →
-  {{{ ▷ l ↦ v' ∗ £1 }}} Write ScOrd (Lit $ LitLoc l) e @ E
+  {{{ ▷ l ↦ v' ∗ £1 }}} Write (Lit $ LitLoc l) e @ E
   {{{ RET LitV LitPoison; l ↦ v }}}.
 Proof.
   iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
@@ -554,33 +544,27 @@ Qed.
 Lemma wp_write_na_guarded E l c e v v' d G :
   ↑naN ⊆ E →
   IntoVal e v →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d) }}} Write Na1Ord (Lit $ LitLoc l) e @ E
+  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) }}} Write (Lit $ LitLoc l) e @ E
   {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G }}}.
 Proof.
   iIntros (Hmask <- Φ) "[#guards [G [Hv £]]] HΦ".
   iApply wp_lift_base_step; auto. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write_na with "£ Hσ guards G Hv") as "(% & Hσ & Hσclose)"; first by trivial.
+  iMod (heap_write with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by trivial.
   iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose". iSplit.
-    { iExists _, _, _, _. iPureIntro. eapply WriteNa1S; done. }
+    { iPureIntro. eexists _, _, _, _. eapply WriteS; eauto. }
   iNext; iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step. iMod "Hclose" as "_".
   iMod (time_interp_step with "Ht") as "$". iModIntro. iFrame "Hσ". iSplit; last done.
-  clear dependent σ1. iApply wp_lift_atomic_base_step_no_fork; auto.
-  iIntros (σ1 stepcnt' κ' κs' n') "[Hσ Ht]".
-  iMod ("Hσclose" with "credit Hσ") as "(%Hw & Hσ & G & Hv)". destruct Hw as [v0 Hw].
-  iMod (time_interp_step with "Ht") as "$". iModIntro; iSplit.
-    { iExists _, _, _, _. iPureIntro. eapply WriteNa2S; done. }
-  iNext; iIntros (e2 σ2 efs Hstep) "credit2 !>"; inv_head_step.
-  iFrame "Hσ". iSplit; [done|]. iApply "HΦ". iFrame.
+  iApply wp_value. iApply "HΦ". iFrame.
 Qed.
 
 Lemma wp_write_na_guarded_0 E l cells e v v' d G :
   ↑naN ⊆ E →
   IntoVal e v →
-  {{{ (G &&{↑naN; d}&&> ((l,cells) #↦_)) ∗ G ∗ (l,cells) #↦ v' ∗ £(3*d) }}} Write Na1Ord (Lit $ LitLoc l) e @ E
+  {{{ (G &&{↑naN; d}&&> ((l,cells) #↦_)) ∗ G ∗ (l,cells) #↦ v' ∗ £(3*d+1) }}} Write (Lit $ LitLoc l) e @ E
   {{{ RET LitV LitPoison; (l,cells) #↦ v ∗ G }}}.
 Proof.
-  iIntros (Hmask Hval 𝛷) "[g G]". iMod (lc_zero) as "£0".
-  iApply wp_write_na_guarded; first trivial. iFrame "g G".
+  iIntros (Hmask Hval 𝛷) "H HΦ".
+  iApply (wp_write_na_guarded with "H"); done.
 Qed.
 
 Local Open Scope nat_scope.
@@ -589,53 +573,43 @@ Lemma wp_write_na_guarded_more_credits E l c e v v' d G d' :
   ↑naN ∪ ↑timeN ⊆ E →
   IntoVal e v →
   time_ctx -∗
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d) ∗ ⧖(d') }}} Write Na1Ord (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G ∗ £(6*d') }}}.
+  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) ∗ ⧖(d') }}} Write (Lit $ LitLoc l) e @ E
+  {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G ∗ £(6*d'+1) }}}.
 Proof.
-  iIntros (Hmask <-) "#TIME". iIntros (Φ). iModIntro. iIntros "[#guards [G [Hv [£ ⧖]]]] HΦ".
+  iIntros (Hmask <-) "#TIME". iIntros (Φ). iModIntro.
+  iIntros "(#guards & G & Hv & £ & ⧖) HΦ".
   rewrite !wp_unfold /wp_pre /=. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write_na with "£ Hσ guards G Hv") as "(% & Hσ & Hσclose)"; first by set_solver.
+  iMod (heap_write _ _ _ v with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by set_solver.
   iMod cumulative_time_receipt_0 as "⧗0".
   iMod (time_receipt_le' with "TIME Ht ⧖ ⧗0") as "[%Htimebound [Ht ⧗0]]"; first by set_solver.
   iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose". iSplit.
-    { iPureIntro. apply base_prim_reducible. eexists _, _, _, _. eapply WriteNa1S; done. }
-  iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step. iModIntro. iNext. iModIntro.
+    { iPureIntro. apply base_prim_reducible. eexists _, _, _, _. eapply WriteS; eauto. }
+  iIntros (e2 σ2 efs Hstep) "credit". iModIntro. iNext. iModIntro.
   iApply (step_fupdN_intro); first by set_solver. iNext. iMod "Hclose" as "_".
-  assert (base_step (Write Na1Ord (Lit (LitLoc l)) (of_val v)) σ1 κ e2 σ2 efs) as Hbasestep.
-    { apply base_reducible_prim_step; trivial. eexists _, _, _, _. eapply WriteNa1S; eauto. }
-  inversion Hbasestep. rewrite H in H8. inversion H8.
-  iMod (time_interp_step with "Ht") as "$". iModIntro. iFrame "Hσ". iSplit; last done.
-  clear dependent σ1. iApply wp_lift_atomic_base_step_no_fork; auto.
-  iIntros (σ1 stepcnt' κ' κs' n') "[Hσ Ht]".
-  iDestruct "credit" as "[£1 £]".
-  iMod ("Hσclose" with "£1 Hσ") as "(%Hw & Hσ & G & Hv)". destruct Hw as [v1 Hw].
-  iMod (time_interp_step with "Ht") as "$". iModIntro; iSplit.
-    { iExists _, _, _, _. iPureIntro. eapply WriteNa2S; done. }
-  iNext; iIntros (e3 σ3 efs3 Hstep3) "credit2 !>"; inv_head_step.
-  iFrame "Hσ". iSplit; [done|]. iApply "HΦ". iFrame.
-  iApply (lc_weaken with "£").
-    - rewrite Nat.add_1_r.
-      cbn [sum_advance_credits].
-      replace (d' + (d' + (d' + (d' + (d' + (d' + 0)))))) with (2 * (2 * d' + d'))%nat by lia.
-      replace (2 ^ stepcnt + (2 ^ stepcnt + 0) + (2 ^ stepcnt + (2 ^ stepcnt + 0) + 0)) with (2 ^ (S (S stepcnt))) in Htimebound.
-      2: { cbn [Nat.pow]. lia. }
-      trans (2 * (2 * 2 ^ S (S stepcnt) + 2 ^ S (S stepcnt))); try lia.
-      cbn [Nat.pow].
-      trans (2 * (2 * 2 ^ stepcnt) * advance_credits (2 * (2 * 2 ^ stepcnt))); try lia.
-      rewrite /advance_credits.
-      cbn [Nat.pow].
-      nia.
+  assert (base_step (Write (Lit (LitLoc l)) (of_val v)) σ1 κ e2 σ2 efs) as Hbasestep.
+    { apply base_reducible_prim_step; trivial. eexists _, _, _, _. eapply WriteS; eauto. }
+  inv_head_step.
+  iMod (time_interp_step with "Ht") as "$".
+  iModIntro.
+  iFrame "Hσ".
+  iSplit; last done.
+  iApply wp_value. iApply "HΦ". iFrame "Hv' G".
+  (* Extract £(6*d'+1) from the per-step credit budget. *)
+  iApply (lc_weaken with "credit").
+  rewrite Nat.add_1_r. cbn [sum_advance_credits].
+  assert (stepcnt + 1 = S stepcnt) as -> by lia. cbn [sum_advance_credits].
+  assert (d' ≤ 2 ^ S (S stepcnt)) as Hd'. { cbn [Nat.pow]. lia. }
+  rewrite /advance_credits. nia.
 Qed.
   
 Lemma wp_write_na E l e v v' :
   ↑naN ⊆ E →
   IntoVal e v →
-  {{{ ▷ l ↦ v' }}} Write Na1Ord (Lit $ LitLoc l) e @ E
+  {{{ ▷ l ↦ v' ∗ £1 }}} Write (Lit $ LitLoc l) e @ E
   {{{ RET LitV LitPoison; l ↦ v }}}.
 Proof.
-  iIntros (Hmask IntoVal Φ) ">pt ToΦ".
-  iMod lc_zero as "£0".
-  iApply (wp_write_na_guarded E l [] e v v' 0 (True)%I with "[pt £0]"); trivial.
+  iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
+  iApply (wp_write_na_guarded E l [] e v v' 0 (True)%I with "[pt £]"); trivial.
    - iFrame. replace ((l, []) #↦_)%I with (True : iProp Σ)%I.
      2: { unfold heap_complete_mapsto. simpl. trivial. }
      iApply guards_true.
@@ -651,22 +625,23 @@ Also, this matches the special case presented in the paper.
 *)
 Lemma wp_cell_move_na E l l' cell v' :
   ↑naN ⊆ E →
-  {{{ l ↦! (FCell cell) ∗ l' ↦ v' }}} Write Na1Ord (Lit $ LitLoc l') (Read Na1Ord (Lit $ LitLoc l)) @ E
+  {{{ l ↦! (FCell cell) ∗ l' ↦ v' ∗ £1 }}} Write (Lit $ LitLoc l') (Read (Lit $ LitLoc l)) @ E
   {{{ RET LitV LitPoison; ∃ v, l ↦ v ∗ l' ↦! (FCell cell) }}}.
 Proof.
-  intros Hmask. iIntros (𝛷) "[pt pt'] post". iApply wp_fupd.
+  intros Hmask. iIntros (𝛷) "(pt & pt' & £) post". iApply wp_fupd.
   (* untether the cell from the location, get a concrete value v *)
   iMod (mapsto_vec_untether1 (l, []) (FCell cell) with "pt") as (v) "[pt [retether ?]]".
   (* copy the concrete value v *)
-  change (Write Na1Ord (Lit (LitLoc l')) (Read Na1Ord (Lit (LitLoc l))))
-      with (fill_item (WriteRCtx Na1Ord (LitV (LitLoc l'))) (Read Na1Ord (Lit (LitLoc l)))).
+  change (Write (Lit (LitLoc l')) (Read (Lit (LitLoc l))))
+      with (fill_item (WriteRCtx (LitV (LitLoc l'))) (Read (Lit (LitLoc l)))).
   iApply wp_bind.
   iApply (wp_read_na with "pt"); first trivial. iModIntro. iIntros "pt".
-  iApply (wp_write_na _ _ _ v with "pt'"); [trivial|done|].
+  iApply (wp_write_na _ _ _ v with "[pt' £]"); [trivial|done| |].
+  { iFrame. }
   (* retether the cell to the new location *)
   iModIntro. iIntros "pt'".
-  iMod ("retether" $! (l', []) with "[pt']") as "[? pt']". { iSplitR. { done. } 
-    unfold heap_complete_mapsto_fancy, split_at_last, rev. simpl. 
+  iMod ("retether" $! (l', []) with "[pt']") as "[? pt']". { iSplitR. { done. }
+    unfold heap_complete_mapsto_fancy, split_at_last, rev. simpl.
     unfold heap_mapsto. iFrame "pt'".
   }
   iModIntro. iApply "post". iFrame.

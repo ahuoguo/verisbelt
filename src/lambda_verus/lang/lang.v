@@ -18,8 +18,6 @@ Inductive base_lit : Set :=
 | LitPoison | LitLoc (l : loc) | LitInt (n : Z).
 Inductive bin_op : Set :=
 | PlusOp | MinusOp | MultOp | LeOp | EqOp | OffsetOp.
-Inductive order : Set :=
-| ScOrd | Na1Ord | Na2Ord.
 
 Notation "[ ]" := (@nil binder) : binder_scope.
 Notation "a :: b" := (@cons binder a%binder b%binder)
@@ -36,8 +34,8 @@ Inductive expr :=
 | BinOp (op : bin_op) (e1 e2 : expr)
 | NdInt
 | App (e : expr) (el : list expr)
-| Read (o : order) (e : expr)
-| Write (o : order) (e1 e2: expr)
+| Read (e : expr)
+| Write (e1 e2: expr)
 | Alloc (e : expr)
 | Free (e1 e2 : expr)
 | Case (e : expr) (el : list expr).
@@ -50,10 +48,10 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   | Var x => bool_decide (x ∈ X)
   | Lit _ | NdInt => true
   | Rec f xl e => is_closed (f :b: xl +b+ X) e
-  | BinOp _ e1 e2 | Write _ e1 e2 | Free e1 e2 =>
+  | BinOp _ e1 e2 | Write e1 e2 | Free e1 e2 =>
     is_closed X e1 && is_closed X e2
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
-  | Read _ e | Alloc e => is_closed X e
+  | Read e | Alloc e => is_closed X e
   end.
 
 Class Closed (X : list string) (e : expr) := closed : is_closed X e.
@@ -82,15 +80,11 @@ Definition to_val (e : expr) : option val :=
   | _ => None
   end.
 
-(** The state: heaps of vals*lockstate. *)
+(** The state: heaps of vals*lockstate. Lock_state is kept for backward-compat
+    with heap.v's CMRA; after the concurrency strip it stays RSt 0 throughout. *)
 Inductive lock_state :=
 | WSt | RSt (n : nat).
-Definition state' : Type := gmap loc (lock_state * val).
-Definition state : Type := gmap loc (lock_state * val) * bool.
-
-Definition σ_map : (state' → state') → (state → state) :=
-    λ f s, (f (fst s), snd s).
-Infix "$σ" := σ_map (at level 70).
+Definition state : Type := gmap loc (lock_state * val).
 
 (** Evaluation contexts *)
 Inductive ectx_item :=
@@ -98,9 +92,9 @@ Inductive ectx_item :=
 | BinOpRCtx (op : bin_op) (v1 : val)
 | AppLCtx (e2 : list expr)
 | AppRCtx (v : val) (vl : list val) (el : list expr)
-| ReadCtx (o : order)
-| WriteLCtx (o : order) (e2 : expr)
-| WriteRCtx (o : order) (v1 : val)
+| ReadCtx
+| WriteLCtx (e2 : expr)
+| WriteRCtx (v1 : val)
 | AllocCtx
 | FreeLCtx (e2 : expr)
 | FreeRCtx (v1 : val)
@@ -112,9 +106,9 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | BinOpRCtx op v1 => BinOp op (of_val v1) e
   | AppLCtx e2 => App e e2
   | AppRCtx v vl el => App (of_val v) ((of_val <$> vl) ++ e :: el)
-  | ReadCtx o => Read o e
-  | WriteLCtx o e2 => Write o e e2
-  | WriteRCtx o v1 => Write o (of_val v1) e
+  | ReadCtx => Read e
+  | WriteLCtx e2 => Write e e2
+  | WriteRCtx v1 => Write (of_val v1) e
   | AllocCtx => Alloc e
   | FreeLCtx e2 => Free e e2
   | FreeRCtx v1 => Free (of_val v1) e
@@ -131,8 +125,8 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | BinOp op e1 e2 => BinOp op (subst x es e1) (subst x es e2)
   | NdInt => NdInt
   | App e el => App (subst x es e) (map (subst x es) el)
-  | Read o e => Read o (subst x es e)
-  | Write o e1 e2 => Write o (subst x es e1) (subst x es e2)
+  | Read e => Read (subst x es e)
+  | Write e1 e2 => Write (subst x es e1) (subst x es e2)
   | Alloc e => Alloc (subst x es e)
   | Free e1 e2 => Free (subst x es e1) (subst x es e2)
   | Case e el => Case (subst x es e) (map (subst x es) el)
@@ -174,13 +168,13 @@ Definition shift_loc (l : loc) (z : Z) : loc := (l.1, l.2 + z).
 Notation "l +ₗ z" := (shift_loc l%L z%Z)
   (at level 50, left associativity) : loc_scope.
 
-Fixpoint init_mem (l:loc) (n:nat) (σ:state') : state' :=
+Fixpoint init_mem (l:loc) (n:nat) (σ:state) : state :=
   match n with
   | O => σ
   | S n => <[l:=(RSt 0, LitV LitPoison)]>(init_mem (l +ₗ 1) n σ)
   end.
 
-Fixpoint free_mem (l:loc) (n:nat) (σ:state') : state' :=
+Fixpoint free_mem (l:loc) (n:nat) (σ:state) : state :=
   match n with
   | O => σ
   | S n => delete l (free_mem (l +ₗ 1) n σ)
@@ -198,10 +192,10 @@ Inductive lit_eq (σ : state) : base_lit → base_lit → Prop :=
    <https://internals.rust-lang.org/t/comparing-dangling-pointers/3019> for some
    more background. *)
 | LocUnallocL l1 l2 :
-    σ.1 !! l1 = None →
+    σ !! l1 = None →
     lit_eq σ (LitLoc l1) (LitLoc l2)
 | LocUnallocR l1 l2 :
-    σ.1 !! l2 = None →
+    σ !! l2 = None →
     lit_eq σ (LitLoc l1) (LitLoc l2).
 
 Inductive lit_neq : base_lit → base_lit → Prop :=
@@ -243,55 +237,29 @@ Inductive head_step : expr → state → list Empty_set → expr → state → l
     Closed (f :b: xl +b+ []) e →
     subst_l (f::xl) (Rec f xl e :: el) e = Some e' →
     head_step (App (Rec f xl e) el) σ [] e' σ []
-| ReadScS l n v σ:
-    σ.1 !! l = Some (RSt n, v) →
-    head_step (Read ScOrd (Lit $ LitLoc l)) σ [] (of_val v) σ []
-| ReadNa1S l n v σ:
-    σ.1 !! l = Some (RSt n, v) →
-    head_step (Read Na1Ord (Lit $ LitLoc l)) σ
-              []
-              (Read Na2Ord (Lit $ LitLoc l)) ((<[l:=(RSt $ S n, v)]>σ.1), σ.2)
-              []
-| ReadNa2S l n v σ:
-    σ.1 !! l = Some (RSt $ S n, v) →
-    head_step (Read Na2Ord (Lit $ LitLoc l)) σ
-              []
-              (of_val v) ((<[l:=(RSt n, v)]>σ.1), σ.2)
-              []
-| WriteScS l e v v' σ:
+| ReadS l n v σ:
+    σ !! l = Some (RSt n, v) →
+    head_step (Read (Lit $ LitLoc l)) σ [] (of_val v) σ []
+| WriteS l e v v' σ:
     to_val e = Some v →
-    σ.1 !! l = Some (RSt 0, v') →
-    head_step (Write ScOrd (Lit $ LitLoc l) e) σ
+    σ !! l = Some (RSt 0, v') →
+    head_step (Write (Lit $ LitLoc l) e) σ
               []
-              (Lit LitPoison) ((<[l:=(RSt 0, v)]>σ.1, σ.2))
-              []
-| WriteNa1S l e v v' σ:
-    to_val e = Some v →
-    σ.1 !! l = Some (RSt 0, v') →
-    head_step (Write Na1Ord (Lit $ LitLoc l) e) σ
-              []
-              (Write Na2Ord (Lit $ LitLoc l) e) ((<[l:=(WSt, v')]>σ.1, σ.2))
-              []
-| WriteNa2S l e v v' σ:
-    to_val e = Some v →
-    σ.1 !! l = Some (WSt, v') →
-    head_step (Write Na2Ord (Lit $ LitLoc l) e) σ
-              []
-              (Lit LitPoison) ((<[l:=(RSt 0, v)]>σ.1, σ.2))
+              (Lit LitPoison) (<[l:=(RSt 0, v)]>σ)
               []
 | AllocS n l σ :
     0 < n →
-    (∀ m, σ.1 !! (l +ₗ m) = None) →
+    (∀ m, σ !! (l +ₗ m) = None) →
     head_step (Alloc $ Lit $ LitInt n) σ
               []
-              (Lit $ LitLoc l) (init_mem l (Z.to_nat n) $σ σ)
+              (Lit $ LitLoc l) (init_mem l (Z.to_nat n) σ)
               []
 | FreeS n l σ :
     0 < n →
-    (∀ m, is_Some (σ.1 !! (l +ₗ m)) ↔ 0 ≤ m < n) →
+    (∀ m, is_Some (σ !! (l +ₗ m)) ↔ 0 ≤ m < n) →
     head_step (Free (Lit $ LitInt n) (Lit $ LitLoc l)) σ
               []
-              (Lit LitPoison) (free_mem l (Z.to_nat n) $σ σ)
+              (Lit LitPoison) (free_mem l (Z.to_nat n) σ)
               []
 | CaseS i el e σ :
     0 ≤ i →
@@ -392,7 +360,7 @@ Proof.
   apply lookup_insert_ne. intros ->; intuition lia.
 Qed.
 
-Definition fresh_block (σ : state') : block :=
+Definition fresh_block (σ : state) : block :=
   let loclst : list loc := elements (dom σ : gset loc) in
   let blockset : gset block := foldr (λ l, ({[l.1]} ∪.)) ∅ loclst in
   fresh blockset.
@@ -407,10 +375,10 @@ Proof.
 Qed.
 
 Lemma alloc_fresh n σ :
-  let l := (fresh_block σ.1, 0) in
+  let l := (fresh_block σ, 0) in
   let init := repeat (LitV $ LitInt 0) (Z.to_nat n) in
   0 < n →
-  head_step (Alloc $ Lit $ LitInt n) σ [] (Lit $ LitLoc l) (init_mem l (Z.to_nat n) $σ σ) [].
+  head_step (Alloc $ Lit $ LitInt n) σ [] (Lit $ LitLoc l) (init_mem l (Z.to_nat n) σ) [].
 Proof.
   intros l init Hn. apply AllocS. auto.
   - intros i. apply (is_fresh_block _ i).
@@ -483,12 +451,12 @@ Proof. destruct b; first done. apply subst_is_closed. Qed.
 
 (* Operations on literals *)
 Lemma lit_eq_state (σ1 σ2 : state) l1 l2 :
-  (∀ l, σ1.1 !! l = None ↔ σ2.1 !! l = None) →
+  (∀ l, σ1 !! l = None ↔ σ2 !! l = None) →
   lit_eq σ1 l1 l2 → lit_eq σ2 l1 l2.
 Proof. intros Heq. inversion 1; econstructor; eauto; eapply Heq; done. Qed.
 
 Lemma bin_op_eval_state σ1 σ2 op l1 l2 l' :
-  (∀ l, σ1.1 !! l = None ↔ σ2.1 !! l = None) →
+  (∀ l, σ1 !! l = None ↔ σ2 !! l = None) →
   bin_op_eval σ1 op l1 l2 l' → bin_op_eval σ2 op l1 l2 l'.
 Proof.
   intros Heq. inversion 1; econstructor; eauto using lit_eq_state.
@@ -503,8 +471,6 @@ Proof. inversion 1. Qed.
 Global Instance base_lit_dec_eq : EqDecision base_lit.
 Proof. solve_decision. Defined.
 Global Instance bin_op_dec_eq : EqDecision bin_op.
-Proof. solve_decision. Defined.
-Global Instance un_op_dec_eq : EqDecision order.
 Proof. solve_decision. Defined.
 
 Fixpoint expr_beq (e : expr) (e' : expr) : bool :=
@@ -525,9 +491,9 @@ Fixpoint expr_beq (e : expr) (e' : expr) : bool :=
   | NdInt, NdInt => true
   | App e el, App e' el' | Case e el, Case e' el' =>
     expr_beq e e' && expr_list_beq el el'
-  | Read o e, Read o' e' => bool_decide (o = o') && expr_beq e e'
-  | Write o e1 e2, Write o' e1' e2' =>
-    bool_decide (o = o') && expr_beq e1 e1' && expr_beq e2 e2'
+  | Read e, Read e' => expr_beq e e'
+  | Write e1 e2, Write e1' e2' =>
+    expr_beq e1 e1' && expr_beq e2 e2'
   | Alloc e, Alloc e' => expr_beq e e'
   | Free e1 e2, Free e1' e2' => expr_beq e1 e1' && expr_beq e2 e2'
   | _, _ => false

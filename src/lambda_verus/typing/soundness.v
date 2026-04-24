@@ -36,11 +36,11 @@ Section type_soundness.
     program, without any special precondition, does not get stuck *)
   Theorem type_soundness `{!typePreG Σ} (main : val) σ t c :
     (∀ `{!typeG Σ}, typed_val main main_type c) →
-    rtc erased_step ([main [exit_cont]%E], (∅, false)) (t, σ) →
+    rtc erased_step ([main [exit_cont]%E], ∅) (t, σ) →
     (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
   Proof.
     intros Hmain Hrtc.
-    cut (adequate NotStuck (main [exit_cont]%E) (∅, false) (λ _ _, True)).
+    cut (adequate NotStuck (main [exit_cont]%E) ∅ (λ _ _, True)).
     { intros. by eapply (adequate_not_stuck _ (main [exit_cont]%E)). }
     apply: lrust_adequacy=>?. iIntros "£ #TIME".
     iMod (llft_alloc with "£") as (?) "#LFT".
@@ -89,7 +89,7 @@ End type_soundness.
 
 Theorem type_soundness_closed (main : val) σ t c :
   (∀ `{!typeG typeΣ}, typed_val main main_type c) →
-  rtc erased_step ([main [exit_cont]%E], (∅, false)) (t, σ) →
+  rtc erased_step ([main [exit_cont]%E], ∅) (t, σ) →
   (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
 Proof.
   intros. eapply @type_soundness; try done. apply _.

@@ -251,7 +251,7 @@ End assert.
    It's just a statement about the operational behavior of pcell_example.
  *)
 Theorem pcell_example_executes_without_getting_stuck σ t :
-  rtc erased_step ([pcell_example [exit_cont]%E], (∅, false)) (t, σ) →
+  rtc erased_step ([pcell_example [exit_cont]%E], ∅) (t, σ) →
   (∀ e, e ∈ t → is_Some (to_val e) ∨ reducible e σ).
 Proof.
   apply (type_soundness_closed pcell_example σ t (pcell_example, ())).

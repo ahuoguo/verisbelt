@@ -11,7 +11,7 @@ Class lrustGpreS Σ := HeapGpreS {
   #[global] lrustGpreS_iris :: invGpreS Σ;
   #[global] lrustGpreS_heap :: inG Σ (authR heapUR);
   #[global] lrustGpreS_heap_freeable :: inG Σ (authR heap_freeableUR);
-  #[global] lrustGpreS_heap_na_logic :: na_logicG loc lang.val Σ;
+  #[global] lrustGpreS_heap_na_logic :: na_logicG loc syntax.val Σ;
   #[global] lrustGpreS_heap_na_inv :: na_invG Σ;
   #[global] lrustGpreS_atomic_lock_ctr :: alc_logicG Σ;
   #[global] lrustGpreS_time :: timePreG Σ
@@ -21,7 +21,7 @@ Definition lrustΣ : gFunctors :=
   #[invΣ; timeΣ;
     GFunctor (constRF (authR heapUR));
     GFunctor (constRF (authR heap_freeableUR));
-    na_logicΣ loc lang.val;
+    na_logicΣ loc syntax.val;
     alc_logicΣ;
     na_invΣ
     ].

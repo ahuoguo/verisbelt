@@ -380,6 +380,19 @@ Proof.
   by iDestruct ("Φ" with "[//]") as "$".
 Qed.
 
+Lemma wp_rand E (N : Z) :
+  0 < N →
+  {{{ True }}} Rand (Lit (LitInt N)) @ E
+  {{{ (z : Z), RET LitV $ LitInt z; ⌜0 ≤ z < N⌝ }}}.
+Proof.
+  iIntros (? Φ _) "HΦ". iApply wp_lift_atomic_base_step_no_fork; auto.
+  iIntros (σ1 stepcnt κ κs n') "[σ t] !>"; iSplit.
+  { iPureIntro. eexists _, _, _, _. eapply (RandS N 0); lia. }
+  iNext; iIntros (v2 σ2 efs Hstep); inv_head_step.
+  iMod (time_interp_step with "t") as "$". iFrame "σ". iIntros "credit".
+  iModIntro. iSplit; first done. iApply ("HΦ" $! z). iPureIntro. lia.
+Qed.
+
 (** Heap *)
 Lemma wp_alloc E (n : Z) :
   0 < n →

@@ -33,7 +33,8 @@ jobs:
             endGroup
             startGroup "Install VerusBelt dependencies"
               opam pin add -n -y -k path $PACKAGE $WORKDIR
-              opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only
+              opam install --confirm-level=unsafe-yes -j 2 \
+                --ignore-constraints-on=rocq-stdpp $PACKAGE --deps-only
             endGroup
           before_script: |
             sudo chown -R 1000:1000 .  

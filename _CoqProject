@@ -92,6 +92,7 @@ src/eris/base_logic/error_credits.v
 src/eris/eris/weakestpre.v
 src/eris/eris/lifting.v
 src/eris/eris/ectx_lifting.v
+src/eris/eris/adequacy.v
 
 # VerusBelt
 
@@ -132,6 +133,8 @@ src/lambda_verus/lang/heap.v
 src/lambda_verus/lang/syntax.v
 src/lambda_verus/lang/lang.v
 src/lambda_verus/lang/prob_lang.v
+src/lambda_verus/lang/heap_prob.v
+src/lambda_verus/lang/adequacy_prob.v
 src/lambda_verus/lang/lifting.v
 src/lambda_verus/lang/notation.v
 src/lambda_verus/lang/proofmode.v

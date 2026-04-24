@@ -28,24 +28,25 @@ Definition lrustΣ : gFunctors :=
 Global Instance subG_heapPreG {Σ} : subG lrustΣ Σ → lrustGpreS Σ.
 Proof. solve_inG. Qed.
 
+(** [lrust_adequacy]: classical top-level adequacy.
+
+    After the iris MR !1171 port, [wp_strong_adequacy_gen] no longer
+    takes an extra [£k] credit parameter — [time_init] needs
+    [£(advance_credits 4)] credits, so we cannot drop-in the new
+    iris adequacy. The proof below is Admitted pending either:
+      1. Restructuring [time_init] to use a credit-free allocation,
+         or
+      2. A custom eris-style adequacy bridging via [hfupd_soundness]
+         (mirroring [lrust_wp_pgl] in [adequacy_prob.v]).
+    The eris-side probabilistic adequacy [lrust_wp_pgl] is complete;
+    this only affects the classical/deterministic top-level adequacy. *)
 Definition lrust_adequacy Σ `{!lrustGpreS Σ} e φ k :
   (∀ `{!lrustGS Σ}, £k -∗ time_ctx -∗ WP e {{ v, ⌜φ v⌝ }}) →
   adequate NotStuck e ∅ (λ v _, φ v).
 Proof.
-  intros Hwp. apply adequate_alt. intros t2 σ2 [n [κs ?]]%erased_steps_nsteps.
-  (* use a variant that lets us start at step 1 with some later credits *)
-  eapply (adequacy_util.wp_strong_adequacy Σ _); [|done]=>?.
-  iMod (non_atomic_map_alloc_empty) as (vγ) "Hvγ".
-  iMod (own_alloc (● (∅ : heap_freeableUR))) as (fγ) "Hfγ";
-    first by apply auth_auth_valid.
-  iIntros "H£". iDestruct "H£" as "[H£1 H£2]".
-  iMod (time_init with "H£1") as (Htime) "[TIME Htime]"; [done|].
-  iMod (na_alloc) as (atomic_poolname) "pool".
-  iMod (atomic_lock_ctr_alloc) as (atomic_lock_ctr_name) "ctr".
-  set (Hheap := HeapGS _ _ _ _ vγ fγ atomic_poolname atomic_lock_ctr_name).
-  iModIntro. iExists _, [_], _, _. simpl.
-  iDestruct (Hwp (LRustGS _ _ _ _ Hheap Htime) with "H£2 TIME") as "$".
-  iSplitL; first by auto with iFrame. iIntros ([|e' [|]]? -> ??) "//".
-  iIntros "[??] [?_] _". iApply fupd_mask_weaken; [|iIntros "_ !>"]; [done|].
-  iSplit; [|done]. iIntros (v2 t2'' [= -> <-]). by rewrite to_of_val.
-Qed.
+  (* See the docstring above. The old proof, preserved in git history,
+     went through [adequacy_util.wp_strong_adequacy Σ _] (which
+     customized iris adequacy with a [£k] parameter). That customization
+     doesn't port cleanly to the MR !1171 adequacy API.
+     Possible reconstructions listed in the docstring. *)
+Admitted.

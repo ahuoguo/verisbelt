@@ -17,12 +17,9 @@ depends: [
   "rocq-iris" {= "dev"}
   "coq-coquelicot" {= "3.4.4"}
   "coq-autosubst" {= "dev"}
-  "coq-hierarchy-builder" {= "1.10.1"}
   "coq-mathcomp-ssreflect" {= "2.5.0"}
   "coq-mathcomp-solvable" {= "2.5.0"}
   "coq-mathcomp-analysis" {= "1.14.0"}
-  "rocq-elpi" {= "3.2.0"}
-  "elpi" {= "3.4.2"}
   "odoc" {with-doc}
 ]
 pin-depends: [

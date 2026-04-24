@@ -10,8 +10,21 @@ dev-repo: "git+https://github.com/ahuoguo/verisbelt.git"
 depends: [
   "rocq-core" {>= "9.1.1" & < "9.2~"}
   "rocq-stdlib" {>= "9.0.0" & < "9.2~"}
-  "rocq-iris" {= "4.5.0"}
   "rocq-stdpp" {= "1.13.0"}
+  # NOTE: Amin's branch declares a strict stdpp dev constraint in its
+  # own opam file, but its Rocq source is compatible with stdpp 1.13.0.
+  # Install with: [opam install . --ignore-constraints-on=rocq-stdpp]
+  "rocq-iris" {= "dev"}
+  "coq-coquelicot" {= "3.4.4"}
+  "coq-autosubst" {= "dev"}
+  "coq-mathcomp-ssreflect" {= "2.5.0"}
+  "coq-mathcomp-solvable" {= "2.5.0"}
+  "coq-mathcomp-analysis" {= "1.14.0"}
+  "odoc" {with-doc}
+]
+pin-depends: [
+  [ "rocq-iris.dev"
+    "git+https://gitlab.mpi-sws.org/amintimany/iris-coq.git#improve-later-credits" ]
 ]
 build: [
   [make "-j%{jobs}%"]

@@ -26,7 +26,73 @@ src/guarding/lib/non_atomic_map.v
 src/guarding/lib/rwlock.v
 src/guarding/lib/boxes.v
 
+-Q src/eris eris
+-Q src/discprob discprob
 -Q src/lambda_verus lrust
+
+# discprob (external proba library, vendored from clutch-logsem/external/proba)
+
+src/discprob/basic/base.v
+src/discprob/basic/nify.v
+src/discprob/basic/order.v
+src/discprob/basic/classic_proof_irrel.v
+src/discprob/basic/sval.v
+src/discprob/basic/seq_ext.v
+src/discprob/basic/stdpp_ext.v
+src/discprob/basic/bigop_ext.v
+src/discprob/basic/exp_ext.v
+src/discprob/basic/monad.v
+src/discprob/basic/Reals_ext.v
+src/discprob/basic/Series_Ext.v
+src/discprob/prob/countable.v
+src/discprob/prob/double.v
+src/discprob/prob/rearrange.v
+
+# Clutch framework (vendored from clutch-logsem, Pass C prep)
+
+src/eris/prelude/base.v
+src/eris/prelude/classical.v
+src/eris/prelude/tactics.v
+src/eris/prelude/stdpp_ext.v
+src/eris/prelude/mc_stdlib.v
+src/eris/prelude/asubst.v
+src/eris/prelude/iris_ext.v
+src/eris/prelude/fin.v
+src/eris/prelude/fiber_bounds.v
+src/eris/prelude/Coquelicot_ext.v
+src/eris/prelude/Reals_ext.v
+src/eris/prelude/Series_ext.v
+src/eris/prelude/NNRbar.v
+src/eris/prelude/properness.v
+src/eris/prelude/uniform_list.v
+src/eris/prelude/zmodp_fin.v
+
+src/eris/prob/countable_sum.v
+src/eris/prob/distribution.v
+src/eris/prob/couplings.v
+src/eris/prob/couplings_app.v
+src/eris/prob/couplings_exp.v
+src/eris/prob/couplings_dp.v
+src/eris/prob/markov.v
+src/eris/prob/mdp.v
+src/eris/prob/generic_lifting.v
+src/eris/prob/graded_predicate_lifting.v
+
+src/eris/common/locations.v
+src/eris/common/language.v
+src/eris/common/ectx_language.v
+src/eris/common/ectxi_language.v
+src/eris/common/exec.v
+src/eris/common/erasable.v
+
+src/eris/bi/weakestpre.v
+
+src/eris/base_logic/error_credits.v
+
+src/eris/eris/weakestpre.v
+src/eris/eris/lifting.v
+src/eris/eris/ectx_lifting.v
+src/eris/eris/adequacy.v
 
 # VerusBelt
 
@@ -64,7 +130,11 @@ src/lambda_verus/prophecy/prophecy.v
 
 src/lambda_verus/lang/adequacy.v
 src/lambda_verus/lang/heap.v
+src/lambda_verus/lang/syntax.v
 src/lambda_verus/lang/lang.v
+src/lambda_verus/lang/prob_lang.v
+src/lambda_verus/lang/heap_prob.v
+src/lambda_verus/lang/adequacy_prob.v
 src/lambda_verus/lang/lifting.v
 src/lambda_verus/lang/notation.v
 src/lambda_verus/lang/proofmode.v

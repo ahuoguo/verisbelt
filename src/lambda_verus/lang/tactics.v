@@ -8,13 +8,14 @@ expressions into this type we can implement substitution, closedness
 checking, atomic checking, and conversion into values, by computation. *)
 Module W.
 Inductive expr :=
-| Val (v : val) (e : lang.expr) (H : to_val e = Some v)
-| ClosedExpr (e : lang.expr) `{!Closed [] e}
+| Val (v : val) (e : syntax.expr) (H : to_val e = Some v)
+| ClosedExpr (e : syntax.expr) `{!Closed [] e}
 | Var (x : string)
 | Lit (l : base_lit)
 | Rec (f : binder) (xl : list binder) (e : expr)
 | BinOp (op : bin_op) (e1 e2 : expr)
 | NdInt
+| Rand (e : expr)
 | App (e : expr) (el : list expr)
 | Read (e : expr)
 | Write (e1 e2: expr)
@@ -23,43 +24,45 @@ Inductive expr :=
 | Case (e : expr) (el : list expr)
 .
 
-Fixpoint to_expr (e : expr) : lang.expr :=
+Fixpoint to_expr (e : expr) : syntax.expr :=
   match e with
   | Val v e' _ => e'
   | ClosedExpr e => e
-  | Var x => lang.Var x
-  | Lit l => lang.Lit l
-  | Rec f xl e => lang.Rec f xl (to_expr e)
-  | BinOp op e1 e2 => lang.BinOp op (to_expr e1) (to_expr e2)
-  | NdInt => lang.NdInt
-  | App e el => lang.App (to_expr e) (map to_expr el)
-  | Read e => lang.Read (to_expr e)
-  | Write e1 e2 => lang.Write (to_expr e1) (to_expr e2)
-  | Alloc e => lang.Alloc (to_expr e)
-  | Free e1 e2 => lang.Free (to_expr e1) (to_expr e2)
-  | Case e el => lang.Case (to_expr e) (map to_expr el)
+  | Var x => syntax.Var x
+  | Lit l => syntax.Lit l
+  | Rec f xl e => syntax.Rec f xl (to_expr e)
+  | BinOp op e1 e2 => syntax.BinOp op (to_expr e1) (to_expr e2)
+  | NdInt => syntax.NdInt
+  | Rand e => syntax.Rand (to_expr e)
+  | App e el => syntax.App (to_expr e) (map to_expr el)
+  | Read e => syntax.Read (to_expr e)
+  | Write e1 e2 => syntax.Write (to_expr e1) (to_expr e2)
+  | Alloc e => syntax.Alloc (to_expr e)
+  | Free e1 e2 => syntax.Free (to_expr e1) (to_expr e2)
+  | Case e el => syntax.Case (to_expr e) (map to_expr el)
   end.
 
 Ltac of_expr e :=
   lazymatch e with
-  | lang.Var ?x => constr:(Var x)
-  | lang.Lit ?l => constr:(Lit l)
-  | lang.Rec ?f ?xl ?e => let e := of_expr e in constr:(Rec f xl e)
-  | lang.BinOp ?op ?e1 ?e2 =>
+  | syntax.Var ?x => constr:(Var x)
+  | syntax.Lit ?l => constr:(Lit l)
+  | syntax.Rec ?f ?xl ?e => let e := of_expr e in constr:(Rec f xl e)
+  | syntax.BinOp ?op ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(BinOp op e1 e2)
-  | lang.NdInt => constr:(NdInt)
-  | lang.App ?e ?el =>
+  | syntax.NdInt => constr:(NdInt)
+  | syntax.Rand ?e => let e := of_expr e in constr:(Rand e)
+  | syntax.App ?e ?el =>
     let e := of_expr e in let el := of_expr el in constr:(App e el)
-  | lang.Read ?e => let e := of_expr e in constr:(Read e)
-  | lang.Write ?e1 ?e2 =>
+  | syntax.Read ?e => let e := of_expr e in constr:(Read e)
+  | syntax.Write ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(Write e1 e2)
-  | lang.Alloc ?e => let e := of_expr e in constr:(Alloc e)
-  | lang.Free ?e1 ?e2 =>
+  | syntax.Alloc ?e => let e := of_expr e in constr:(Alloc e)
+  | syntax.Free ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(Free e1 e2)
-  | lang.Case ?e ?el =>
+  | syntax.Case ?e ?el =>
      let e := of_expr e in let el := of_expr el in constr:(Case e el)
-  | @nil lang.expr => constr:(@nil expr)
-  | @cons lang.expr ?e ?el =>
+  | @nil syntax.expr => constr:(@nil expr)
+  | @cons syntax.expr ?e ?el =>
     let e := of_expr e in let el := of_expr el in constr:(e::el)
   | to_expr ?e => e
   | of_val ?v => constr:(Val v (of_val v) (to_of_val v))
@@ -78,9 +81,9 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   | BinOp _ e1 e2 | Write e1 e2 | Free e1 e2 =>
     is_closed X e1 && is_closed X e2
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
-  | Read e | Alloc e => is_closed X e
+  | Read e | Alloc e | Rand e => is_closed X e
   end.
-Lemma is_closed_correct X e : is_closed X e → lang.is_closed X (to_expr e).
+Lemma is_closed_correct X e : is_closed X e → syntax.is_closed X (to_expr e).
 Proof.
   revert e X. fix FIX 1; destruct e=>/=;
     try naive_solver eauto using is_closed_to_val, is_closed_weaken_nil.
@@ -110,7 +113,7 @@ Lemma to_val_is_Some e :
   is_Some (to_val e) → ∃ v, of_val v = to_expr e.
 Proof. intros [v ?]; exists v; eauto using to_val_Some. Qed.
 Lemma to_val_is_Some' e :
-  is_Some (to_val e) → is_Some (lang.to_val (to_expr e)).
+  is_Some (to_val e) → is_Some (syntax.to_val (to_expr e)).
 Proof. intros [v ?]%to_val_is_Some. exists v. rewrite -to_of_val. by f_equal. Qed.
 
 Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
@@ -123,6 +126,7 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
     Rec f xl $ if bool_decide (BNamed x ≠ f ∧ BNamed x ∉ xl) then subst x es e else e
   | BinOp op e1 e2 => BinOp op (subst x es e1) (subst x es e2)
   | NdInt => NdInt
+  | Rand e => Rand (subst x es e)
   | App e el => App (subst x es e) (map (subst x es) el)
   | Read e => Read (subst x es e)
   | Write e1 e2 => Write (subst x es e1) (subst x es e2)
@@ -131,7 +135,7 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | Case e el => Case (subst x es e) (map (subst x es) el)
   end.
 Lemma to_expr_subst x er e :
-  to_expr (subst x er e) = lang.subst x (to_expr er) (to_expr e).
+  to_expr (subst x er e) = syntax.subst x (to_expr er) (to_expr e).
 Proof.
   revert e x er. fix FIX 1; destruct e=>/= ? er; repeat case_bool_decide;
     f_equal; eauto using is_closed_nil_subst, is_closed_to_val, eq_sym.
@@ -141,7 +145,7 @@ Qed.
 
 Definition is_atomic (e: expr) : bool :=
   match e with
-  | Read e | Alloc e => bool_decide (is_Some (to_val e))
+  | Read e | Alloc e | Rand e => bool_decide (is_Some (to_val e))
   | Write e1 e2 | Free e1 e2 =>
     bool_decide (is_Some (to_val e1) ∧ is_Some (to_val e2))
   | _ => false
@@ -255,6 +259,7 @@ Ltac reshape_expr e tac :=
     reshape_val e1 ltac:(fun v1 => go (WriteRCtx v1 :: K) e2)
   | Write ?e1 ?e2 => go (WriteLCtx e2 :: K) e1
   | Alloc ?e => go (AllocCtx :: K) e
+  | Rand ?e => go (RandCtx :: K) e
   | Free ?e1 ?e2 => reshape_val e1 ltac:(fun v1 => go (FreeRCtx v1 :: K) e2)
   | Free ?e1 ?e2 => go (FreeLCtx e2 :: K) e1
   | Case ?e ?el => go (CaseCtx el :: K) e

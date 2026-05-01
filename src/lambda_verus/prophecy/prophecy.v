@@ -123,9 +123,9 @@ Proof.
      + clear FIX. have h1 := IH𝔄l x padding.
        replace (@ξl (xsumₛ (@cons syn_type 𝔄₀ 𝔄l))
        (@pair (@psum syn_type indep_interp_of_syn_type (@cons syn_type 𝔄₀ 𝔄l)) 
-          (list lang.val)
+          (list syntax.val)
           (@inr (indep_interp_of_syn_type 𝔄₀) (@psum syn_type indep_interp_of_syn_type 𝔄l) x)
-          padding)) with (@ξl (xsumₛ 𝔄l) (@pair (@psum syn_type indep_interp_of_syn_type 𝔄l) (list lang.val) x padding)).
+          padding)) with (@ξl (xsumₛ 𝔄l) (@pair (@psum syn_type indep_interp_of_syn_type 𝔄l) (list syntax.val) x padding)).
        * apply (proph_dep_constr (λ '(a, b), (inr a, b)) _ _ h1).
        * simpl. destruct (to_xsum (psum_map1 (λ (A : syn_type) (x0 : ~~ A), ξl x0) x)). trivial.
    - destruct x. apply (proph_dep_constr (λ i, (_,i))). apply (FIX 𝔄).

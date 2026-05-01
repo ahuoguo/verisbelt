@@ -1,8 +1,8 @@
 From lrust.util Require Import non_atomic_cell_map.
 From iris.proofmode Require Import proofmode reduction environments coq_tactics.
 From iris.proofmode Require Export proofmode.
-From iris.program_logic Require Export weakestpre.
-From iris.program_logic Require Import lifting.
+From clutch.eris Require Export weakestpre.
+From clutch.eris Require Import lifting.
 From lrust.lang Require Export tactics lifting.
 Set Default Proof Using "Type".
 Import uPred.

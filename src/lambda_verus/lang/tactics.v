@@ -15,6 +15,7 @@ Inductive expr :=
 | Rec (f : binder) (xl : list binder) (e : expr)
 | BinOp (op : bin_op) (e1 e2 : expr)
 | NdInt
+| Rand (e : expr)
 | App (e : expr) (el : list expr)
 | Read (e : expr)
 | Write (e1 e2: expr)
@@ -32,6 +33,7 @@ Fixpoint to_expr (e : expr) : lang.expr :=
   | Rec f xl e => lang.Rec f xl (to_expr e)
   | BinOp op e1 e2 => lang.BinOp op (to_expr e1) (to_expr e2)
   | NdInt => lang.NdInt
+  | Rand e => lang.Rand (to_expr e)
   | App e el => lang.App (to_expr e) (map to_expr el)
   | Read e => lang.Read (to_expr e)
   | Write e1 e2 => lang.Write (to_expr e1) (to_expr e2)
@@ -48,6 +50,7 @@ Ltac of_expr e :=
   | lang.BinOp ?op ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(BinOp op e1 e2)
   | lang.NdInt => constr:(NdInt)
+  | lang.Rand ?e => let e := of_expr e in constr:(Rand e)
   | lang.App ?e ?el =>
     let e := of_expr e in let el := of_expr el in constr:(App e el)
   | lang.Read ?e => let e := of_expr e in constr:(Read e)
@@ -78,7 +81,7 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   | BinOp _ e1 e2 | Write e1 e2 | Free e1 e2 =>
     is_closed X e1 && is_closed X e2
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
-  | Read e | Alloc e => is_closed X e
+  | Read e | Alloc e | Rand e => is_closed X e
   end.
 Lemma is_closed_correct X e : is_closed X e → lang.is_closed X (to_expr e).
 Proof.
@@ -123,6 +126,7 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
     Rec f xl $ if bool_decide (BNamed x ≠ f ∧ BNamed x ∉ xl) then subst x es e else e
   | BinOp op e1 e2 => BinOp op (subst x es e1) (subst x es e2)
   | NdInt => NdInt
+  | Rand e => Rand (subst x es e)
   | App e el => App (subst x es e) (map (subst x es) el)
   | Read e => Read (subst x es e)
   | Write e1 e2 => Write (subst x es e1) (subst x es e2)
@@ -141,7 +145,7 @@ Qed.
 
 Definition is_atomic (e: expr) : bool :=
   match e with
-  | Read e | Alloc e => bool_decide (is_Some (to_val e))
+  | Read e | Alloc e | Rand e => bool_decide (is_Some (to_val e))
   | Write e1 e2 | Free e1 e2 =>
     bool_decide (is_Some (to_val e1) ∧ is_Some (to_val e2))
   | _ => false
@@ -255,6 +259,7 @@ Ltac reshape_expr e tac :=
     reshape_val e1 ltac:(fun v1 => go (WriteRCtx v1 :: K) e2)
   | Write ?e1 ?e2 => go (WriteLCtx e2 :: K) e1
   | Alloc ?e => go (AllocCtx :: K) e
+  | Rand ?e => go (RandCtx :: K) e
   | Free ?e1 ?e2 => reshape_val e1 ltac:(fun v1 => go (FreeRCtx v1 :: K) e2)
   | Free ?e1 ?e2 => go (FreeLCtx e2 :: K) e1
   | Case ?e ?el => go (CaseCtx el :: K) e

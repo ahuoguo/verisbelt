@@ -1,9 +1,27 @@
-From iris.program_logic Require Export language ectx_language ectxi_language.
+(** Pure λRust syntax + the clutch [ectxi_language] wrapper.
+
+    The pure-data section is wrapped in [Module Export pure] so that its
+    names ([expr], [val], [state], [to_val], [of_val], …) can be
+    re-imported after [clutch.common.language]'s [Export]; otherwise
+    clutch's record projections of the same names would shadow our
+    inductives. *)
 From stdpp Require Export strings binders.
-From stdpp Require Import gmap.
+From stdpp Require Import gmap countable.
+From stdpp Require Export ssreflect.
+From iris.prelude Require Import options.
 Set Default Proof Using "Type".
 
+(* nat → Z coercion and expr/val scope delimiters normally come with
+   iris.bi.prelude and iris.bi.weakestpre.*)
+Coercion Z.of_nat : nat >-> Z.
+Declare Scope expr_scope.
+Delimit Scope expr_scope with E.
+Declare Scope val_scope.
+Delimit Scope val_scope with V.
+
 Open Scope Z_scope.
+
+Module Export pure.
 
 (** Expressions and vals. *)
 Definition block : Set := positive.
@@ -33,6 +51,7 @@ Inductive expr :=
 | Rec (f : binder) (xl : list binder) (e : expr)
 | BinOp (op : bin_op) (e1 e2 : expr)
 | NdInt
+| Rand (e : expr)
 | App (e : expr) (el : list expr)
 | Read (e : expr)
 | Write (e1 e2: expr)
@@ -51,7 +70,7 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   | BinOp _ e1 e2 | Write e1 e2 | Free e1 e2 =>
     is_closed X e1 && is_closed X e2
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
-  | Read e | Alloc e => is_closed X e
+  | Read e | Alloc e | Rand e => is_closed X e
   end.
 
 Class Closed (X : list string) (e : expr) := closed : is_closed X e.
@@ -98,7 +117,8 @@ Inductive ectx_item :=
 | AllocCtx
 | FreeLCtx (e2 : expr)
 | FreeRCtx (v1 : val)
-| CaseCtx (el : list expr).
+| CaseCtx (el : list expr)
+| RandCtx.
 
 Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
@@ -113,6 +133,7 @@ Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   | FreeLCtx e2 => Free e e2
   | FreeRCtx v1 => Free (of_val v1) e
   | CaseCtx el => Case e el
+  | RandCtx => Rand e
   end.
 
 (** Substitution *)
@@ -124,6 +145,7 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
     Rec f xl $ if bool_decide (BNamed x ≠ f ∧ BNamed x ∉ xl) then subst x es e else e
   | BinOp op e1 e2 => BinOp op (subst x es e1) (subst x es e2)
   | NdInt => NdInt
+  | Rand e => Rand (subst x es e)
   | App e el => App (subst x es e) (map (subst x es) el)
   | Read e => Read (subst x es e)
   | Write e1 e2 => Write (subst x es e1) (subst x es e2)
@@ -232,6 +254,9 @@ Inductive head_step : expr → state → list Empty_set → expr → state → l
     head_step (BinOp op (Lit l1) (Lit l2)) σ [] (Lit l') σ []
 | NdIntS z σ :
     head_step NdInt σ [] (Lit (LitInt z)) σ []
+| RandS N z σ :
+    0 ≤ z → z < N →
+    head_step (Rand (Lit (LitInt N))) σ [] (Lit (LitInt z)) σ []
 | BetaS f xl e e' el σ:
     Forall (λ ei, is_Some (to_val ei)) el →
     Closed (f :b: xl +b+ []) e →
@@ -314,8 +339,8 @@ Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
   to_val e1 = None → to_val e2 = None →
   fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
 Proof.
-  destruct Ki1 as [| | |v1 vl1 el1| | | | | | |],
-           Ki2 as [| | |v2 vl2 el2| | | | | | |];
+  destruct Ki1 as [| | |v1 vl1 el1| | | | | | | |],
+           Ki2 as [| | |v2 vl2 el2| | | | | | | |];
   intros He1 He2 EQ; try discriminate; simplify_eq/=;
     repeat match goal with
     | H : to_val (of_val _) = None |- _ => by rewrite to_of_val in H
@@ -380,8 +405,8 @@ Lemma alloc_fresh n σ :
   0 < n →
   head_step (Alloc $ Lit $ LitInt n) σ [] (Lit $ LitLoc l) (init_mem l (Z.to_nat n) σ) [].
 Proof.
-  intros l init Hn. apply AllocS. auto.
-  - intros i. apply (is_fresh_block _ i).
+  intros l init Hn. apply AllocS; [exact Hn|].
+  intros i. apply (is_fresh_block _ i).
 Qed.
 
 Lemma lookup_free_mem_ne σ l l' n : l.1 ≠ l'.1 → free_mem l n σ !! l' = σ !! l'.
@@ -403,9 +428,9 @@ Lemma is_closed_weaken X Y e : is_closed X e → X ⊆ Y → is_closed Y e.
 Proof.
   revert e X Y. fix FIX 1; destruct e=>X Y/=; try naive_solver.
   - naive_solver set_solver.
-  - rewrite !andb_True. intros [He Hel] HXY. split. by eauto.
+  - rewrite !andb_True. intros [He Hel] HXY. split; [by eauto|].
     induction el=>/=; naive_solver.
-  - rewrite !andb_True. intros [He Hel] HXY. split. by eauto.
+  - rewrite !andb_True. intros [He Hel] HXY. split; [by eauto|].
     induction el=>/=; naive_solver.
 Qed.
 
@@ -489,8 +514,9 @@ Fixpoint expr_beq (e : expr) (e' : expr) : bool :=
   | BinOp op e1 e2, BinOp op' e1' e2' =>
     bool_decide (op = op') && expr_beq e1 e1' && expr_beq e2 e2'
   | NdInt, NdInt => true
+  | Rand e, Rand e' => expr_beq e e'
   | App e el, App e' el' | Case e el, Case e' el' =>
-    expr_beq e e' && expr_list_beq el el'
+    expr_beq e e' && expr_list_beq el el' 
   | Read e, Read e' => expr_beq e e'
   | Write e1 e2, Write e1' e2' =>
     expr_beq e1 e1' && expr_beq e2 e2'
@@ -501,8 +527,8 @@ Fixpoint expr_beq (e : expr) (e' : expr) : bool :=
 Lemma expr_beq_correct (e1 e2 : expr) : expr_beq e1 e2 ↔ e1 = e2.
 Proof.
   revert e1 e2; fix FIX 1.
-    destruct e1 as [| | | | |? el1| | | | |? el1],
-             e2 as [| | | | |? el2| | | | |? el2]; simpl; try done;
+    destruct e1 as [| | | | | |? el1| | | | |? el1],
+             e2 as [| | | | | |? el2| | | | |? el2]; simpl; try done;
   rewrite ?andb_True ?bool_decide_spec ?FIX;
   try (split; intro; [destruct_and?|split_and?]; congruence).
   - match goal with |- context [?F el1 el2] => assert (F el1 el2 ↔ el1 = el2) end.
@@ -526,29 +552,119 @@ Defined.
 Global Instance expr_inhabited : Inhabited expr := populate (Lit LitPoison).
 Global Instance val_inhabited : Inhabited val := populate (LitV LitPoison).
 
-Canonical Structure stateO := leibnizO state.
-Canonical Structure valO := leibnizO val.
-Canonical Structure exprO := leibnizO expr.
-
-(** Language *)
-Lemma lrust_lang_mixin : EctxiLanguageMixin of_val to_val fill_item head_step.
+(** Countable instances. Required by clutch's probabilistic ectxiLanguage.
+    loc is a pair of [positive] (= block) and [Z], both countable. *)
+Global Instance base_lit_countable : Countable base_lit.
 Proof.
-  split; apply _ || eauto using to_of_val, of_to_val,
-    val_stuck, fill_item_val, fill_item_no_val_inj, head_ctx_step_val.
+  refine (inj_countable'
+    (λ l, match l with
+      | LitPoison => inl ()
+      | LitLoc l => inr (inl l)
+      | LitInt n => inr (inr n)
+      end)
+    (λ x, match x with
+      | inl () => LitPoison
+      | inr (inl l) => LitLoc l
+      | inr (inr n) => LitInt n
+      end) _).
+  by intros [].
 Qed.
-Canonical Structure lrust_ectxi_lang := EctxiLanguage lrust_lang_mixin.
-Canonical Structure lrust_ectx_lang := EctxLanguageOfEctxi lrust_ectxi_lang.
-Canonical Structure lrust_lang := LanguageOfEctx lrust_ectx_lang.
 
-(* Lemmas about the language. *)
-Lemma stuck_irreducible K σ : irreducible (fill K stuck_term) σ.
+Local Close Scope Z_scope.
+Global Instance bin_op_countable : Countable bin_op.
 Proof.
-  apply: (irreducible_fill (K:=ectx_language.fill K)); first done.
-  apply prim_base_irreducible.
-  - inversion 1.
-  - apply ectxi_language_sub_redexes_are_values.
-    intros [] ??; simplify_eq/=; eauto; discriminate_list.
+  refine (inj_countable'
+    (λ op, match op with
+      | PlusOp => 0%nat | MinusOp => 1%nat | MultOp => 2%nat
+      | LeOp => 3%nat | EqOp => 4%nat | OffsetOp => 5%nat
+      end)
+    (λ n : nat, match n with
+      | 0 => PlusOp | 1 => MinusOp | 2 => MultOp
+      | 3 => LeOp | 4 => EqOp | _ => OffsetOp
+      end) _).
+  by intros [].
 Qed.
+Local Open Scope Z_scope.
+
+Global Instance lock_state_eq_dec : EqDecision lock_state.
+Proof. solve_decision. Defined.
+Global Instance lock_state_countable : Countable lock_state.
+Proof.
+  refine (inj_countable'
+    (λ s, match s with WSt => inl () | RSt n => inr n end)
+    (λ x, match x with inl () => WSt | inr n => RSt n end) _).
+  by intros [].
+Qed.
+
+Global Instance expr_countable : Countable expr.
+Proof.
+  set (enc := fix go e :=
+    match e with
+    | Var x => GenLeaf (inl (inl x))
+    | Lit l => GenLeaf (inr (inl l))
+    | Rec f xl e =>
+        GenNode 0 [GenLeaf (inl (inr f)); GenLeaf (inr (inr xl)); go e]
+    | BinOp op e1 e2 =>
+        GenNode 1 [GenLeaf (inr (inl (LitInt (match op with
+          | PlusOp => 0 | MinusOp => 1 | MultOp => 2
+          | LeOp => 3 | EqOp => 4 | OffsetOp => 5
+          end)))); go e1; go e2]
+    | NdInt => GenNode 2 []
+    | Rand e => GenNode 3 [go e]
+    | App e el => GenNode 4 (go e :: map go el)
+    | Read e => GenNode 5 [go e]
+    | Write e1 e2 => GenNode 6 [go e1; go e2]
+    | Alloc e => GenNode 7 [go e]
+    | Free e1 e2 => GenNode 8 [go e1; go e2]
+    | Case e el => GenNode 9 (go e :: map go el)
+    end).
+  set (dec := fix go t :=
+    match t with
+    | GenLeaf (inl (inl x)) => Var x
+    | GenLeaf (inr (inl l)) => Lit l
+    | GenNode 0 [GenLeaf (inl (inr f)); GenLeaf (inr (inr xl)); e] =>
+        Rec f xl (go e)
+    | GenNode 1 [GenLeaf (inr (inl (LitInt n))); e1; e2] =>
+        BinOp (match n with
+          | 0 => PlusOp | 1 => MinusOp | 2 => MultOp
+          | 3 => LeOp | 4 => EqOp | _ => OffsetOp
+          end) (go e1) (go e2)
+    | GenNode 2 [] => NdInt
+    | GenNode 3 [e] => Rand (go e)
+    | GenNode 4 (e :: el) => App (go e) (map go el)
+    | GenNode 5 [e] => Read (go e)
+    | GenNode 6 [e1; e2] => Write (go e1) (go e2)
+    | GenNode 7 [e] => Alloc (go e)
+    | GenNode 8 [e1; e2] => Free (go e1) (go e2)
+    | GenNode 9 (e :: el) => Case (go e) (map go el)
+    | _ => Lit LitPoison (* unreachable *)
+    end).
+  refine (inj_countable' enc dec _).
+  fix go 1.
+  intros [x | l | f xl e | op e1 e2 | | e | e el | e | e1 e2 | e | e1 e2 | e el]; simpl.
+  - done.
+  - done.
+  - by rewrite go.
+  - destruct op; by rewrite !go.
+  - done.
+  - by rewrite go.
+  - f_equal; [by rewrite go|]. induction el as [|e' el' IH]; simpl; [done|]. by rewrite go IH.
+  - by rewrite go.
+  - by rewrite !go.
+  - by rewrite go.
+  - by rewrite !go.
+  - f_equal; [by rewrite go|]. induction el as [|e' el' IH]; simpl; [done|]. by rewrite go IH.
+Qed.
+
+Global Instance val_countable : Countable val.
+Proof.
+  refine (inj_countable of_val to_val _).
+  intros v; by rewrite to_of_val.
+Qed.
+
+(* The Iris-specific [leibnizO] canonical structures and the
+   [EctxiLanguageMixin] instance live in [lang.v], which re-exports
+   this file along with the relevant Iris modules. *)
 
 (* Define some derived forms *)
 Notation Lam xl e := (Rec BAnon xl e) (only parsing).
@@ -567,3 +683,380 @@ Notation Share := (Seq Skip Skip) (only parsing).
 Notation UniqBor := (Seq Skip Skip) (only parsing).
 Notation ReBor := (Seq Skip Skip) (only parsing).
 Notation SplitBor := (Seq Skip Skip) (only parsing).
+
+End pure.
+
+(** ============================================================================
+    Clutch [ectxi_language] wrapping (formerly [prob_lang.v]).
+    =========================================================================== *)
+From Stdlib Require Import Reals Psatz.
+From stdpp Require Import fin_maps.
+From clutch.common Require Export language ectx_language ectxi_language.
+From clutch.prob Require Export distribution.
+From clutch.prelude Require Import stdpp_ext classical.
+
+(* Re-export [pure] so that [expr], [val], [state], [to_val], [of_val], …
+   refer to our inductives instead of [clutch.common.language]'s
+   record projections that were just [Export]ed above. The re-export
+   here re-binds the names in the order: clutch first, [pure] last,
+   so [pure] dominates downstream of this file. *)
+Export pure.
+
+Global Open Scope Z_scope.
+Local Open Scope R.
+
+(** * Computable, probabilistic head step *)
+
+(** Computable pointer/integer equality — the probabilistic variant of
+    [lit_eq] from [lang.v]. We drop the [LocUnallocL/R] non-deterministic
+    cases: pointer equality is fully structural here. *)
+Definition lit_eq_dec (l1 l2 : base_lit) : option bool :=
+  match l1, l2 with
+  | LitInt z1, LitInt z2 => Some (bool_decide (z1 = z2))
+  | LitLoc p1, LitLoc p2 => Some (bool_decide (p1 = p2))
+  | LitInt 0%Z, LitLoc _ | LitLoc _, LitInt 0%Z => Some false
+  | _, _ => None
+  end.
+
+Definition bin_op_eval_fn (op : bin_op) (l1 l2 : base_lit) : option base_lit :=
+  match op, l1, l2 with
+  | PlusOp, LitInt z1, LitInt z2 => Some (LitInt (z1 + z2))
+  | MinusOp, LitInt z1, LitInt z2 => Some (LitInt (z1 - z2))
+  | MultOp, LitInt z1, LitInt z2 => Some (LitInt (z1 * z2))
+  | LeOp, LitInt z1, LitInt z2 =>
+      Some (lit_of_bool (bool_decide (z1 ≤ z2)%Z))
+  | EqOp, _, _ =>
+      (λ b, lit_of_bool b) <$> lit_eq_dec l1 l2
+  | OffsetOp, LitLoc l, LitInt z => Some (LitLoc (shift_loc l z))
+  | _, _, _ => None
+  end.
+
+Definition fresh_loc (σ : state) : loc := (fresh_block σ, 0%Z).
+
+Definition head_step_prob (e : expr) (σ : state) : distr (expr * state) :=
+  match e with
+  | App (Rec f xl e) el =>
+      if bool_decide (Forall (λ ei, is_Some (to_val ei)) el ∧
+                      Closed (f :b: xl +b+ []) e) then
+        match subst_l (f :: xl) (Rec f xl e :: el) e with
+        | Some e' => dret (e', σ)
+        | None => dzero
+        end
+      else dzero
+  | BinOp op (Lit l1) (Lit l2) =>
+      match bin_op_eval_fn op l1 l2 with
+      | Some l' => dret (Lit l', σ)
+      | None => dzero
+      end
+  (* Uniform sampling from [0, N). [dunifP k] samples from [fin (S k)],
+     so with bound [Z.to_nat N - 1] we get [fin (Z.to_nat N)] when N ≥ 1. *)
+  | Rand (Lit (LitInt N)) =>
+      if bool_decide (0 < N)%Z then
+        dmap (λ n : fin (S (Z.to_nat N - 1)),
+              (Lit (LitInt (Z.of_nat (fin_to_nat n))), σ))
+             (dunifP (Z.to_nat N - 1))
+      else dzero
+  | Read (Lit (LitLoc l)) =>
+      match σ !! l with
+      | Some (RSt _, v) => dret (of_val v, σ)
+      | _ => dzero
+      end
+  | Write (Lit (LitLoc l)) e2 =>
+      match to_val e2, σ !! l with
+      | Some v, Some (RSt 0, _) =>
+          dret (Lit LitPoison, <[l := (RSt 0, v)]> σ)
+      | _, _ => dzero
+      end
+  | Alloc (Lit (LitInt n)) =>
+      if bool_decide (0 < n)%Z then
+        let ℓ := fresh_loc σ in
+        dret (Lit (LitLoc ℓ), init_mem ℓ (Z.to_nat n) σ)
+      else dzero
+  | Free (Lit (LitInt n)) (Lit (LitLoc l)) =>
+      if bool_decide (0 < n)%Z then
+        dret (Lit LitPoison, free_mem l (Z.to_nat n) σ)
+      else dzero
+  | Case (Lit (LitInt i)) el =>
+      if bool_decide (0 ≤ i)%Z then
+        match el !! Z.to_nat i with
+        | Some ei => dret (ei, σ)
+        | None => dzero
+        end
+      else dzero
+  (* Unbounded non-determinism ([NdInt]) is not expressible as a
+     discrete probability distribution; it is stuck in the
+     probabilistic semantics. Use [Rand #N] for bounded sampling. *)
+  | _ => dzero
+  end.
+
+(** * Trivial [state_step] / [get_active] — no presampling tapes.
+
+    [state_idx := Empty_set] — there are no tape identifiers. *)
+Definition state_step_prob (σ : state) (α : Empty_set) : distr state := dzero.
+Definition get_active (σ : state) : list Empty_set := [].
+
+(** * Evaluation-context decomposition *)
+
+(** [decomp_item e = Some (Ki, e')] iff [e = fill_item Ki e'] and [e']
+    is not a value. Left-to-right evaluation order. *)
+Definition decomp_item (e : expr) : option (ectx_item * expr) :=
+  let noval (e' : expr) (Ki : ectx_item) :=
+    match to_val e' with Some _ => None | None => Some (Ki, e') end in
+  match e with
+  | BinOp op e1 e2 =>
+      match to_val e1 with
+      | None => noval e1 (BinOpLCtx op e2)
+      | Some v1 => noval e2 (BinOpRCtx op v1)
+      end
+  | Read e' => noval e' ReadCtx
+  | Rand e' => noval e' RandCtx
+  | Write e1 e2 =>
+      match to_val e1 with
+      | None => noval e1 (WriteLCtx e2)
+      | Some v1 => noval e2 (WriteRCtx v1)
+      end
+  | Alloc e' => noval e' AllocCtx
+  | Free e1 e2 =>
+      match to_val e1 with
+      | None => noval e1 (FreeLCtx e2)
+      | Some v1 => noval e2 (FreeRCtx v1)
+      end
+  | Case e' el => noval e' (CaseCtx el)
+  | App e' el =>
+      (* Either [e'] is not a value (AppLCtx), or we're walking the
+         argument list left-to-right (AppRCtx). *)
+      match to_val e' with
+      | None => noval e' (AppLCtx el)
+      | Some v =>
+          (* Scan [el] for the first non-value argument. *)
+          let fix scan (vl : list val) (el : list expr) : option (ectx_item * expr) :=
+            match el with
+            | [] => None
+            | e'' :: el' =>
+                match to_val e'' with
+                | None => Some (AppRCtx v (reverse vl) el', e'')
+                | Some v' => scan (v' :: vl) el'
+                end
+            end in
+          scan [] el
+      end
+  | _ => None
+  end.
+
+(** * Expression ordering (well-founded) via structural height *)
+Fixpoint expr_height (e : expr) : nat :=
+  match e with
+  | Var _ | Lit _ | NdInt => 0
+  | Rec _ _ e => S (expr_height e)
+  | BinOp _ e1 e2 | Write e1 e2 | Free e1 e2 =>
+      S (Nat.max (expr_height e1) (expr_height e2))
+  | App e el | Case e el =>
+      S (Nat.max (expr_height e) (list_max (expr_height <$> el)))
+  | Read e | Alloc e | Rand e => S (expr_height e)
+  end.
+
+Definition expr_ord (e1 e2 : expr) : Prop := (expr_height e1 < expr_height e2)%nat.
+
+Lemma expr_ord_wf' h e : (expr_height e ≤ h)%nat → Acc expr_ord e.
+Proof.
+  revert e; induction h as [|h IH]; intros e Hh; constructor; intros e' He'.
+  - rewrite /expr_ord in He'. lia.
+  - apply IH. rewrite /expr_ord in He'. lia.
+Qed.
+
+Lemma expr_ord_wf : well_founded expr_ord.
+Proof. red. intros e. eapply expr_ord_wf'. done. Qed.
+
+(** * Countability of [ectx_item] (required by the eris mixin). *)
+Global Instance ectx_item_eq_dec : EqDecision ectx_item.
+Proof. solve_decision. Defined.
+
+Global Instance ectx_item_countable : Countable ectx_item.
+Proof.
+  set (enc := λ Ki,
+    match Ki with
+    | BinOpLCtx op e2 => GenNode 0 [GenLeaf (inl op); GenLeaf (inr (inl e2))]
+    | BinOpRCtx op v1 => GenNode 1 [GenLeaf (inl op); GenLeaf (inr (inr v1))]
+    | AppLCtx el      => GenNode 2 [GenLeaf (inr (inl (App (Lit LitPoison) el)))]
+    | AppRCtx v vl el => GenNode 3 [GenLeaf (inr (inr v));
+                                    GenLeaf (inr (inl (App (Lit LitPoison) (map of_val vl))));
+                                    GenLeaf (inr (inl (App (Lit LitPoison) el)))]
+    | ReadCtx         => GenNode 4 []
+    | WriteLCtx e2    => GenNode 5 [GenLeaf (inr (inl e2))]
+    | WriteRCtx v1    => GenNode 6 [GenLeaf (inr (inr v1))]
+    | AllocCtx        => GenNode 7 []
+    | FreeLCtx e2     => GenNode 8 [GenLeaf (inr (inl e2))]
+    | FreeRCtx v1     => GenNode 9 [GenLeaf (inr (inr v1))]
+    | CaseCtx el      => GenNode 10 [GenLeaf (inr (inl (App (Lit LitPoison) el)))]
+    | RandCtx         => GenNode 11 []
+    end).
+  set (unpack_list := λ e,
+    match e with App _ el => el | _ => [] end).
+  set (unpack_vals := λ e,
+    match e with App _ el =>
+      foldr (λ e' acc, match to_val e' with Some v => v :: acc | None => acc end) [] el
+    | _ => []
+    end).
+  set (dec := λ t,
+    match t with
+    | GenNode 0 [GenLeaf (inl op); GenLeaf (inr (inl e2))] => BinOpLCtx op e2
+    | GenNode 1 [GenLeaf (inl op); GenLeaf (inr (inr v1))] => BinOpRCtx op v1
+    | GenNode 2 [GenLeaf (inr (inl e))] => AppLCtx (unpack_list e)
+    | GenNode 3 [GenLeaf (inr (inr v)); GenLeaf (inr (inl evl)); GenLeaf (inr (inl eel))] =>
+        AppRCtx v (unpack_vals evl) (unpack_list eel)
+    | GenNode 4 [] => ReadCtx
+    | GenNode 5 [GenLeaf (inr (inl e2))] => WriteLCtx e2
+    | GenNode 6 [GenLeaf (inr (inr v1))] => WriteRCtx v1
+    | GenNode 7 [] => AllocCtx
+    | GenNode 8 [GenLeaf (inr (inl e2))] => FreeLCtx e2
+    | GenNode 9 [GenLeaf (inr (inr v1))] => FreeRCtx v1
+    | GenNode 10 [GenLeaf (inr (inl e))] => CaseCtx (unpack_list e)
+    | GenNode 11 [] => RandCtx
+    | _ => ReadCtx (* unreachable *)
+    end).
+  refine (inj_countable' enc dec _).
+  intros [| | | v vl el | | | | | | | |]; simpl; subst unpack_list unpack_vals;
+    try reflexivity.
+  (* AppRCtx: round-trip [vl] through [map of_val] + [foldr to_val]. *)
+  f_equal. clear v el. induction vl as [|w vl IH]; simpl; [reflexivity|].
+  by rewrite to_of_val IH.
+Qed.
+
+(** * EctxiLanguage mixin obligations
+
+    The trivial ones ([state_step_*]) are discharged here; the
+    non-trivial cases ([val_stuck_prob], [head_step_mass_prob],
+    [head_ctx_step_val_prob], [decomp_*]) are left as a follow-up. *)
+
+Lemma state_step_head_not_stuck e σ σ' (α : Empty_set) :
+  state_step_prob σ α σ' > 0 →
+  (∃ ρ, head_step_prob e σ ρ > 0) ↔ (∃ ρ', head_step_prob e σ' ρ' > 0).
+Proof. destruct α. Qed.
+
+Lemma state_step_mass σ (α : Empty_set) :
+  α ∈ get_active σ → SeriesC (state_step_prob σ α) = 1.
+Proof. destruct α. Qed.
+
+Lemma val_stuck_prob e σ ρ :
+  head_step_prob e σ ρ > 0 → to_val e = None.
+Proof.
+  intros Hstep. destruct e eqn:He; simpl in *; try reflexivity;
+    try (rewrite dzero_0 in Hstep; lra).
+Qed.
+
+Lemma head_ctx_step_val_prob Ki e σ ρ :
+  head_step_prob (fill_item Ki e) σ ρ > 0 → is_Some (to_val e).
+Proof.
+  intros H. destruct Ki; simpl in H; (repeat case_match);
+    try (rewrite dzero_0 in H; lra);
+    try (eexists; simpl; reflexivity); eauto using to_of_val.
+  - apply bool_decide_eq_true in H1 as [_ HC]. simpl. case_decide; eauto.
+    contradiction.
+  - apply bool_decide_eq_true in H1 as [HF _].
+    apply Forall_app in HF as [_ HF]. apply Forall_cons in HF as [He _]. exact He.
+Qed.
+
+Lemma head_step_mass_prob e σ :
+  (∃ ρ, head_step_prob e σ ρ > 0) → SeriesC (head_step_prob e σ) = 1.
+Proof.
+  intros [ρ Hρ]. destruct e; simpl in *; (repeat case_match);
+    try (rewrite dzero_0 in Hρ; lra);
+    try (rewrite dret_mass; reflexivity).
+  rewrite dmap_mass dunifP_mass. reflexivity.
+Qed.
+
+Lemma decomp_expr_ord Ki e e' :
+  decomp_item e = Some (Ki, e') → expr_ord e' e.
+Proof.
+  rewrite /expr_ord /decomp_item.
+  destruct e; try discriminate; (repeat case_match); try discriminate;
+    try (intros [= <- <-]; simpl; lia).
+  generalize (@nil val) as vl. induction el as [|e'' el' IH]; intros vl Hscan.
+  - discriminate.
+  - destruct (to_val e'') eqn:Hv''.
+    + specialize (IH _ Hscan).
+      cbn [expr_height list_max fmap list_fmap] in *.
+      simpl list_max. lia.
+    + injection Hscan as <- <-. cbn [expr_height].
+      change (expr_height <$> e'' :: el') with
+             (expr_height e'' :: (expr_height <$> el')).
+      simpl list_max. lia.
+Qed.
+
+Lemma decomp_fill_item Ki e :
+  to_val e = None → decomp_item (fill_item Ki e) = Some (Ki, e).
+Proof.
+  intros Hnv. destruct Ki; simpl; rewrite ?Hnv; try reflexivity.
+  all: rewrite ?to_of_val ?Hnv //.
+  (* AppRCtx: induction over the accumulator-threading scan. *)
+  assert (∀ acc,
+    (fix scan (vl0 : list val) (el0 : list expr) {struct el0} :
+        option (ectx_item * expr) :=
+      match el0 with
+      | [] => None
+      | e'' :: el' =>
+          match to_val e'' with
+          | Some v' => scan (v' :: vl0) el'
+          | None => Some (AppRCtx v (reverse vl0) el', e'')
+          end
+      end) acc ((of_val <$> vl) ++ e :: el)
+    = Some (AppRCtx v (reverse acc ++ vl) el, e)) as Hgen.
+  { intros acc. induction vl as [|v' vl' IH] in acc |- *; simpl.
+    - rewrite Hnv app_nil_r. done.
+    - rewrite to_of_val IH. f_equal. f_equal. f_equal.
+      rewrite reverse_cons -app_assoc. done. }
+  specialize (Hgen []). rewrite Hgen reverse_nil //.
+Qed.
+
+Lemma decomp_fill_item_2 e e' Ki :
+  decomp_item e = Some (Ki, e') → fill_item Ki e' = e ∧ to_val e' = None.
+Proof.
+  rewrite /decomp_item. destruct e; try discriminate;
+    (repeat case_match); try discriminate;
+    try (intros [= <- <-]; simpl; split; [rewrite ?of_to_val //|done]).
+  1,3,4: f_equal; by apply of_to_val.
+  (* AppRCtx: extract the structural relation from the scan, then read off
+     the fill_item and non-value facts. *)
+  assert (∀ acc,
+    (fix scan (vl : list val) (el0 : list expr) {struct el0} :
+        option (ectx_item * expr) :=
+      match el0 with
+      | [] => None
+      | e'' :: el' =>
+          match to_val e'' with
+          | Some v' => scan (v' :: vl) el'
+          | None => Some (AppRCtx v (reverse vl) el', e'')
+          end
+      end) acc el = Some (Ki, e') →
+    ∃ vls elr, el = (of_val <$> vls) ++ e' :: elr
+      ∧ Ki = AppRCtx v (reverse acc ++ vls) elr ∧ to_val e' = None) as Hgen.
+  { clear. induction el as [|e0 el' IH]; intros acc Hscan.
+    - discriminate.
+    - simpl in Hscan. destruct (to_val e0) eqn:He0.
+      + apply IH in Hscan as (vls & elr & -> & HK & ?).
+        exists (v0 :: vls), elr. split; [|split]; [| |done].
+        { simpl. apply of_to_val in He0. rewrite He0 //. }
+        { rewrite HK. rewrite reverse_cons -app_assoc //. }
+      + injection Hscan as <- <-. exists [], el'. split; [|split]; [| |done].
+        { simpl. reflexivity. }
+        { rewrite app_nil_r //. } }
+  intros Hscan. apply Hgen in Hscan as (vls & elr & -> & -> & ?).
+  apply of_to_val in H. rewrite -H. split; [|done]. reflexivity.
+Qed.
+
+(** * Canonical [ectxiLanguage] for the probabilistic λRust. *)
+
+Lemma lrust_prob_lang_mixin :
+  EctxiLanguageMixin of_val to_val fill_item decomp_item expr_ord
+    head_step_prob state_step_prob get_active.
+Proof.
+  split; apply _ || eauto using to_of_val, of_to_val, val_stuck_prob,
+    state_step_head_not_stuck, state_step_mass, head_step_mass_prob,
+    fill_item_val, fill_item_no_val_inj, head_ctx_step_val_prob,
+    decomp_fill_item, decomp_fill_item_2, expr_ord_wf, decomp_expr_ord.
+Qed.
+
+Canonical Structure lrust_prob_ectxi_lang :=
+  EctxiLanguage get_active lrust_prob_lang_mixin (def_val := LitV LitPoison).
+Canonical Structure lrust_prob_ectx_lang := EctxLanguageOfEctxi lrust_prob_ectxi_lang.
+Canonical Structure lrust_prob_lang := LanguageOfEctx lrust_prob_ectx_lang.

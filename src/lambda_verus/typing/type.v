@@ -1,8 +1,7 @@
 From iris.algebra Require Import numbers list dfrac_agree.
 From lrust.util Require Export basic vector update fancy_lists cancellable cancellable_na_invariants.
-From lrust.prophecy Require Export prophecy.
 From lrust.lang Require Export proofmode notation heap.
-From lrust.typing Require Export base uniq_cmra.
+From lrust.typing Require Export base syn_type.
 From lrust.typing Require Export lft_contexts.
 From lrust.typing Require Export lifetime.
 From lrust.lifetime Require Import lifetime_full.
@@ -14,8 +13,6 @@ Implicit Type (𝔄 𝔅 ℭ: syn_type) (𝔄l 𝔅l: syn_typel).
 
 Class typeG Σ := TypeG {
   #[global] type_lrustGS :: lrustGS Σ;
-  #[global] type_prophG :: prophG Σ;
-  #[global] type_uniqG :: uniqG Σ;
   #[global] type_lftGS :: llft_logicGS Σ;
   #[global] type_frac_logicG :: frac_logicG Σ;
   #[global] type_ecInv_logicΣ :: ecInv_logicG Σ;

@@ -1,6 +1,8 @@
 From lrust.lang Require Export notation.
-From lrust.lang Require Import heap proofmode memcpy.
+From lrust.lang Require Import heap proofmode.
+From lrust.lang.lib Require Import memcpy.
 Set Default Proof Using "Type".
+Open Scope Z_scope.
 
 Definition new : val :=
   λ: ["n"],
@@ -21,10 +23,11 @@ Section specs.
     {{{ l, RET LitV $ LitLoc l;
         (†l…(Z.to_nat n) ∨ ⌜n = 0⌝) ∗ l ↦∗ repeat (LitV LitPoison) (Z.to_nat n) }}}.
   Proof.
-    iIntros (? Φ) "_ HΦ". wp_lam. wp_op; case_bool_decide.
+    iIntros (? Φ) "_ HΦ". rewrite /new. wp_lam. wp_op; case_bool_decide.
     - wp_if. assert (n = 0) as -> by lia. iApply "HΦ".
       rewrite heap_mapsto_vec_nil. auto.
-    - wp_if. wp_alloc l as "H↦" "H†". lia. iApply "HΦ". subst sz. iFrame.
+    - wp_if. wp_alloc l as "H↦" "H†"; first lia.
+      iApply "HΦ". rewrite (_: Z.to_nat n = sz); [iFrame|lia].
   Qed.
 
   Lemma wp_delete vl (n: Z) l E :
@@ -34,7 +37,7 @@ Section specs.
     {{{ RET #☠; True }}}.
   Proof.
     iIntros (?? Φ) "(H↦ & [H†|%]) HΦ";
-      wp_lam; wp_op; case_bool_decide; try lia;
+      rewrite /delete; wp_lam; wp_op; case_bool_decide; try lia;
       wp_if; try wp_free; by iApply "HΦ".
   Qed.
 End specs.

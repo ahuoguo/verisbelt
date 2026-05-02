@@ -1,16 +1,24 @@
-From lrust.util Require Import non_atomic_cell_map.
 From iris.proofmode Require Import proofmode reduction environments coq_tactics.
 From iris.proofmode Require Export proofmode.
 From clutch.eris Require Export weakestpre.
 From clutch.eris Require Import lifting.
 From lrust.lang Require Export tactics lifting.
+From lrust.lang Require Import heap.
+From lrust.util Require Import non_atomic_cell_map.
 Set Default Proof Using "Type".
 Import uPred.
 
+(** Minimal proofmode wiring against eris's [pgl_wp]. The pure-step
+    fragment (value, bind, pure rule + [wp_rec/lam/let/seq/if/case])
+    is ported here; the heap-touching tactics ([wp_alloc],
+    [wp_read], [wp_write], [wp_free], [wp_eq_loc], [wp_nd_int]) and
+    the corresponding [tac_wp_*] lemmas are deferred — they need
+    notation for [↦] and the heap-side WP rules to be re-derived
+    against [pgl_wp]. *)
 Lemma tac_wp_value `{!lrustGS Σ} Δ E Φ e v :
   IntoVal e v →
   envs_entails Δ (Φ v) → envs_entails Δ (WP e @ E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> ? ->. by apply wp_value. Qed.
+Proof. rewrite envs_entails_unseal=> ? ->. by apply pgl_wp_value. Qed.
 
 Ltac wp_value_head := eapply tac_wp_value; [tc_solve|reduction.pm_prettify].
 
@@ -21,10 +29,9 @@ Lemma tac_wp_pure `{!lrustGS Σ} K Δ Δ' E e1 e2 φ n Φ :
   envs_entails Δ' (WP fill K e2 @ E {{ Φ }}) →
   envs_entails Δ (WP fill K e1 @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal=> ??? HΔ'. rewrite into_laterN_env_sound /=.
-  rewrite -wp_bind HΔ' -wp_pure_step_later //. rewrite -wp_bind_inv. f_equiv.
-  by iIntros.
-Qed. 
+  rewrite envs_entails_unseal=> HPE Hφ ? HΔ'. rewrite into_laterN_env_sound HΔ'.
+  apply: wp_pure_step_later; [|exact Hφ]. by apply (pure_exec_ctx (fill K)).
+Qed.
 
 Tactic Notation "wp_pure" open_constr(efoc) :=
   iStartProof;
@@ -40,42 +47,18 @@ Tactic Notation "wp_pure" open_constr(efoc) :=
   | _ => fail "wp_pure: not a 'wp'"
   end.
 
-Lemma tac_wp_eq_loc `{!lrustGS Σ} K Δ Δ' E i1 i2 l1 l2 v1 v2 Φ :
-  ↑naN ⊆ E →
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i1 Δ' = Some (false, l1 ↦ v1)%I →
-  envs_lookup i2 Δ' = Some (false, l2 ↦ v2)%I →
-  envs_entails Δ' (WP fill K (Lit (bool_decide (l1 = l2))) @ E {{ Φ }}) →
-  envs_entails Δ (WP fill K (BinOp EqOp (Lit (LitLoc l1)) (Lit (LitLoc l2))) @ E {{ Φ }}).
-Proof.
-  intros Hmask.
-  rewrite envs_entails_unseal=> ? /envs_lookup_sound /=. rewrite sep_elim_l=> ?.
-  move /envs_lookup_sound; rewrite sep_elim_l=> ? HΔ. rewrite -wp_bind.
-  rewrite into_laterN_env_sound /=. 
-  iApply wp_eq_loc; trivial; by apply entails_wand, later_mono.
-Qed.
-
-Tactic Notation "wp_eq_loc" :=
-  iStartProof;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-     reshape_expr e ltac:(fun K e' => eapply (tac_wp_eq_loc K));
-       [tc_solve|iAssumptionCore|iAssumptionCore|simpl; try wp_value_head]
-  | _ => fail "wp_pure: not a 'wp'"
-  end.
-
 Tactic Notation "wp_rec" := wp_pure (App _ _).
 Tactic Notation "wp_lam" := wp_rec.
 Tactic Notation "wp_let" := wp_lam.
 Tactic Notation "wp_seq" := wp_let.
-Tactic Notation "wp_op" := wp_pure (BinOp _ _ _) || wp_eq_loc.
+Tactic Notation "wp_op" := wp_pure (BinOp _ _ _).
 Tactic Notation "wp_if" := wp_pure (If _ _ _).
 Tactic Notation "wp_case" := wp_pure (Case _ _); try wp_value_head.
 
 Lemma tac_wp_bind `{!lrustGS Σ} K Δ E Φ e :
   envs_entails Δ (WP e @ E {{ v, WP fill K (of_val v) @ E {{ Φ }} }})%I →
   envs_entails Δ (WP fill K e @ E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> ->. apply: wp_bind. Qed.
+Proof. rewrite envs_entails_unseal=> ->. apply: pgl_wp_bind. Qed.
 
 Ltac wp_bind_core K :=
   lazymatch eval hnf in K with
@@ -93,32 +76,27 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
   | _ => fail "wp_bind: not a 'wp'"
   end.
 
+(** * Heap-side proofmode: ports of [tac_wp_alloc/free/read/write] and
+    their [wp_*] surface tactics, retargeted at our eris-side WP rules
+    in [lifting.v]. *)
 Section heap.
 Context `{!lrustGS Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types Δ : envs (uPredI (iResUR Σ)).
 
-Lemma tac_wp_nd_int `{!lrustGS Σ} K Δ Δ' E Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  (∀z, envs_entails Δ' (WP fill K (Lit (LitInt z)) @ E {{ Φ }})) →
-  envs_entails Δ (WP fill K NdInt @ E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ? HΔ'. rewrite into_laterN_env_sound /=.
-  rewrite -wp_bind /=. iIntros "Δ'". iApply (wp_nd_int with "[//]")=>/=. iNext.
-  iIntros. by iApply HΔ'.
-Qed.
-
 Lemma tac_wp_alloc K Δ Δ' E j1 j2 n Φ :
-  0 < n →
+  (0 < n)%Z →
   MaybeIntoLaterNEnvs 1 Δ Δ' →
-  (∀ l (sz: nat), n = sz → ∃ Δ'',
-    envs_app false (Esnoc (Esnoc Enil j1 (l ↦∗ repeat (LitV LitPoison) sz)) j2 (†l…sz)) Δ'
+  (∀ l (sz : nat), n = sz → ∃ Δ'',
+    envs_app false (Esnoc (Esnoc Enil j1
+                            (l ↦∗ repeat (LitV LitPoison) sz))
+                          j2 (†l…sz)) Δ'
       = Some Δ'' ∧
     envs_entails Δ'' (WP fill K (Lit $ LitLoc l) @ E {{ Φ }})) →
   envs_entails Δ (WP fill K (Alloc (Lit $ LitInt n)) @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal=> ?? HΔ. rewrite -wp_bind into_laterN_env_sound /=.
+  rewrite envs_entails_unseal=> ?? HΔ. rewrite -pgl_wp_bind into_laterN_env_sound /=.
   iIntros "Δ". iApply wp_alloc=>//. iNext. iIntros (l sz) "[%eq [† ↦]]".
   move: (HΔ l sz eq)=> [?[/envs_app_sound-> ->]]/=. iApply "Δ". iFrame.
 Qed.
@@ -134,7 +112,7 @@ Lemma tac_wp_free K Δ Δ' Δ'' Δ''' E i1 i2 vl (n : Z) (n' : nat) l Φ :
   envs_entails Δ''' (WP fill K (Lit LitPoison) @ E {{ Φ }}) →
   envs_entails Δ (WP fill K (Free (Lit $ LitInt n) (Lit $ LitLoc l)) @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal; intros ? -> ?? <- ? <- -> HΔ. rewrite -wp_bind.
+  rewrite envs_entails_unseal; intros ? -> ?? <- ? <- -> HΔ. rewrite -pgl_wp_bind.
   rewrite into_laterN_env_sound /=. do 2 (rewrite envs_lookup_sound //=).
   rewrite HΔ. iIntros "(↦ & † & wp)". iApply (wp_free with "[$↦ $† //]")=>//.
   iNext. by iIntros.
@@ -147,167 +125,95 @@ Lemma tac_wp_read K Δ Δ' E i l v Φ :
   envs_entails Δ' (WP fill K (of_val v) @ E {{ Φ }}) →
   envs_entails Δ (WP fill K (Read (Lit $ LitLoc l)) @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal. intros Hmask ?? HΔ. rewrite -wp_bind.
+  rewrite envs_entails_unseal. intros Hmask ?? HΔ. rewrite -pgl_wp_bind.
   rewrite into_laterN_env_sound envs_lookup_split //= HΔ. iIntros "[↦ →wp]".
-  by iApply (wp_read_na with "↦").
+  by iApply (wp_read with "↦").
 Qed.
 
-(*
-Lemma tac_wp_read_guarded K Δ Δ' E i l H F v o Φ :
-  o = Na1Ord ∨ o = ScOrd →
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (true, H &&{F}&&> (l ↦ v))%I →
-  envs_lookup i Δ' = Some (false, H)%I →
-  envs_entails Δ' (WP fill K (of_val v) @ E {{ Φ }}) →
-  envs_entails Δ (WP fill K (Read o (Lit $ LitLoc l)) @ E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal; intros [->| ->] ???.
-*)
-
-(* After the concurrency strip, a single-step write requires an extra £1 credit.
-   We look up the credit in Δ (before MaybeIntoLaterN wraps everything in ▷)
-   so the credit stays bare — WP's later only wraps the mapsto. *)
-Lemma tac_wp_write K Δ Δ' Δ'' E i j l v e v' Φ :
+Lemma tac_wp_write K Δ Δ' Δ'' E i l v e v' Φ :
   IntoVal e v' → ↑non_atomic_cell_map.naN ⊆ E →
-  envs_lookup j Δ = Some (false, £1)%I →
-  MaybeIntoLaterNEnvs 1 (envs_delete true j false Δ) Δ' →
+  MaybeIntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, (l ↦ v)%I) →
   envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' = Some Δ'' →
   envs_entails Δ'' (WP fill K (Lit LitPoison) @ E {{ Φ }}) →
   envs_entails Δ (WP fill K (Write (Lit $ LitLoc l) e) @ E {{ Φ }}).
 Proof.
-  rewrite envs_entails_unseal; intros ?? Hj ? Hi Hsimpl HΦ. rewrite -wp_bind.
-  rewrite (envs_lookup_sound _ j false) //=.
-  rewrite into_laterN_env_sound.
-  rewrite (envs_simple_replace_sound _ _ i) //=.
-  rewrite HΦ. simpl.
-  iIntros "[£ Hlater]".
-  iDestruct "Hlater" as "(↦ & Henv)".
-  iApply (wp_write_na with "[$↦ $£]"); [done|].
-  iNext; iIntros "↦". iApply "Henv". iFrame.
+  rewrite envs_entails_unseal; intros <- ?? Hi Hsimpl HΦ. rewrite -pgl_wp_bind.
+  rewrite into_laterN_env_sound /=.
+  rewrite envs_simple_replace_singleton_sound //=.
+  iIntros "[↦ →env]". iApply (wp_write with "↦")=>//.
+  iNext. iIntros "↦". iApply HΦ. by iApply "→env".
 Qed.
+
 End heap.
 
-Tactic Notation "wp_apply" open_constr(lem) :=
-  iPoseProofCore lem as false (fun H =>
-    lazymatch goal with
-    | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-      reshape_expr e ltac:(fun K e' =>
-        wp_bind_core K; iApplyHyp H; try iNext; simpl) ||
-      lazymatch iTypeOf H with
-      | Some (_,?P) => fail "wp_apply: cannot apply" P
-      end
-    | _ => fail "wp_apply: not a 'wp'"
-    end).
-
-Tactic Notation "wp_nd_int" ident(z) :=
-  iStartProof;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) => reshape_expr e ltac:(fun K e' =>
-    unify e' NdInt;
-    eapply (tac_wp_nd_int K);
-    [tc_solve                                   (* IntoLaters *)
-    |iIntros (z); simpl_subst; try wp_value_head (* new goal *)])
-   || fail "wp_nd_int: cannot find NdInt in" e
-  | _ => fail "wp_nd_int: not a 'wp'"
-  end.
-
+(** Surface tactics for the heap-side rules. *)
 Tactic Notation "wp_alloc" ident(l) "as" constr(H) constr(Hf) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_alloc K _ _ _ H Hf))
-      |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
-    [try fast_done
-    |tc_solve
-    |let sz := fresh "sz" in let Hsz := fresh "Hsz" in
-     first [intros l sz Hsz | fail 1 "wp_alloc:" l "not fresh"];
-     (* If Hsz is "constant Z = nat", change that to an equation on nat and
-        potentially substitute away the sz. *)
-     try (match goal with Hsz : ?x = _ |- _ => rewrite <-(Z2Nat.id x) in Hsz; last done end;
-          apply Nat2Z.inj in Hsz;
-          try (cbv [Z.to_nat Pos.to_nat] in Hsz;
-               simpl in Hsz;
-               (* Substitute only if we have a literal nat. *)
-               match goal with Hsz : S _ = _ |- _ => subst sz end));
-      eexists; split;
-        [pm_reflexivity || fail "wp_alloc:" H "or" Hf "not fresh"
-        |simpl; try wp_value_head]]
+  | |- envs_entails _ (wp ?s ?E ?e ?Q) => reshape_expr e ltac:(fun K e' =>
+    match e' with
+    | Alloc _ => eapply (tac_wp_alloc K _ _ _ H Hf)
+    end);
+    [try fast_done                    (* 0 < n *)
+    |tc_solve                          (* IntoLaters *)
+    |let sz := fresh "sz" in
+     let Hsz := fresh "Hsz" in
+     intros l sz Hsz; eexists; split;
+       [reduction.pm_reflexivity || fail "wp_alloc: name" l "not fresh"
+       |simpl; try wp_value_head]]
   | _ => fail "wp_alloc: not a 'wp'"
   end.
-
-Tactic Notation "wp_alloc" ident(l) :=
-  let H := iFresh in let Hf := iFresh in wp_alloc l as H Hf.
 
 Tactic Notation "wp_free" :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_free K))
-      |fail 1 "wp_free: cannot find 'Free' in" e];
-    [try fast_done|try fast_done
-    |tc_solve
+  | |- envs_entails _ (wp ?s ?E ?e ?Q) => reshape_expr e ltac:(fun K e' =>
+    match e' with
+    | Free _ _ => eapply (tac_wp_free K)
+    end);
+    [try fast_done                    (* mask *)
+    |try fast_done                    (* n = length vl *)
+    |tc_solve                          (* IntoLaters *)
     |let l := match goal with |- _ = Some (_, (?l ↦∗ _)%I) => l end in
      iAssumptionCore || fail "wp_free: cannot find" l "↦∗ ?"
-    |pm_reflexivity
-    |let l := match goal with |- _ = Some (_, († ?l … _)%I) => l end in
+    |reduction.pm_reflexivity
+    |let l := match goal with |- _ = Some (_, (†?l…_)%I) => l end in
      iAssumptionCore || fail "wp_free: cannot find †" l "… ?"
-    |pm_reflexivity
-    |try fast_done
-    |simpl; try first [wp_pure (Seq (Lit LitPoison) _)|wp_value_head]]
+    |reduction.pm_reflexivity
+    |try fast_done                    (* n' = length vl *)
+    |simpl; try wp_value_head]
   | _ => fail "wp_free: not a 'wp'"
   end.
 
 Tactic Notation "wp_read" :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_read K)) => //
-      |fail 1 "wp_read: cannot find 'Read' in" e];
-    [tc_solve
+  | |- envs_entails _ (wp ?s ?E ?e ?Q) => reshape_expr e ltac:(fun K e' =>
+    match e' with
+    | Read _ => eapply (tac_wp_read K)
+    end);
+    [try fast_done                    (* mask *)
+    |tc_solve                          (* IntoLaters *)
     |let l := match goal with |- _ = Some (_, (?l ↦ _)%I) => l end in
      iAssumptionCore || fail "wp_read: cannot find" l "↦ ?"
     |simpl; try wp_value_head]
   | _ => fail "wp_read: not a 'wp'"
   end.
-  
-  
-  (*
-Tactic Notation "wp_read_guarded" :=
-  iStartProof;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_read_guarded K))
-      |fail 1 "wp_read: cannot find 'Read' in" e];
-    [(right; fast_done) || (left; fast_done) ||
-     fail "wp_read: order is neither Na2Ord nor ScOrd"
-    |tc_solve
-    |let l := match goal with |- _ = Some (_, (guards _ _ _ (?l ↦ _)%I)) => l end in
-     iAssumptionCore || fail "wp_read: cannot find" l "↦ ?"
-    |let l := match goal with |- _ = Some (_, ?l) => l end in
-     iAssumptionCore || fail "wp_read: cannot find guard prop " l " ?"
-    |simpl; try wp_value_head]
-  | _ => fail "wp_read: not a 'wp'"
-  end.
-*)
 
 Tactic Notation "wp_write" :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_wp_write K); [tc_solve|..])
-      |fail 1 "wp_write: cannot find 'Write' in" e];
-    [try fast_done
-    |iAssumptionCore || fail "wp_write: cannot find a £ 1 hypothesis"
-    |tc_solve
+  | |- envs_entails _ (wp ?s ?E ?e ?Q) => reshape_expr e ltac:(fun K e' =>
+    match e' with
+    | Write _ _ => eapply (tac_wp_write K)
+    end);
+    [tc_solve                          (* IntoVal *)
+    |try fast_done                    (* mask *)
+    |tc_solve                          (* IntoLaters *)
     |let l := match goal with |- _ = Some (_, (?l ↦ _)%I) => l end in
      iAssumptionCore || fail "wp_write: cannot find" l "↦ ?"
-    |pm_reflexivity
+    |reduction.pm_reflexivity
     |simpl; try first [wp_pure (Seq (Lit LitPoison) _)|wp_value_head]]
   | _ => fail "wp_write: not a 'wp'"
   end.

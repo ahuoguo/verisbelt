@@ -1,8 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From lrust.util Require Import basic cancellable atomic_lock_counter.
 From lrust.lang Require Import proofmode.
-From lrust.typing Require Export base lifetime lft_contexts uniq_cmra.
-From lrust.prophecy Require Import syn_type.
+From lrust.typing Require Export base lifetime lft_contexts syn_type.
 From lrust.lifetime Require Import lifetime_full.
 From guarding Require Import guard tactics.
 Require Import guarding.internal.na_invariants_fork.
@@ -23,12 +22,11 @@ Local Definition thread_id := gname.
 Section inv_contexts.
   Context `{!invGS Σ, !llft_logicGS Σ}.
   Context `{!lrustGS Σ}.
-  Context `{!uniqG Σ}.
   Context `{!cnaInv_logicG Σ}.
   Local Existing Instance cnaInv_na_inv_inG.
   Implicit Type (κ: lft).
-  
-  Definition ATOMIC_POOL : na_inv_pool_name := atomic_threadpool.
+
+  Definition ATOMIC_POOL : na_inv_pool_name := heap.atomic_threadpool.
   
   Definition invctx_elt_unwrap (elt: invctx_elt) : lft :=
       match elt with InvCtx_open κ => κ end.
@@ -39,7 +37,7 @@ Section inv_contexts.
   Definition atomic_ctx (mask: Mask) (𝛼: invctx_atomic_state) : iProp Σ :=
       match 𝛼 with
           | AtomicClosed => ⌜mask = ⊤⌝
-          | AtomicOpen n => atomic_lock_ctr atomic_lock_ctr_name n mask ∗ na_own ATOMIC_POOL mask
+          | AtomicOpen n => atomic_lock_ctr heap.atomic_lock_ctr_name n mask ∗ na_own ATOMIC_POOL mask
       end.
   
   Definition invctx_interp (tid: thread_id) (mask: Mask) (iκs: list lft) (ictx: invctx) : iProp Σ :=

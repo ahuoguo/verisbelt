@@ -8,8 +8,8 @@ expressions into this type we can implement substitution, closedness
 checking, atomic checking, and conversion into values, by computation. *)
 Module W.
 Inductive expr :=
-| Val (v : val) (e : lang.expr) (H : to_val e = Some v)
-| ClosedExpr (e : lang.expr) `{!Closed [] e}
+| Val (v : val) (e : pure.expr) (H : to_val e = Some v)
+| ClosedExpr (e : pure.expr) `{!Closed [] e}
 | Var (x : string)
 | Lit (l : base_lit)
 | Rec (f : binder) (xl : list binder) (e : expr)
@@ -24,45 +24,45 @@ Inductive expr :=
 | Case (e : expr) (el : list expr)
 .
 
-Fixpoint to_expr (e : expr) : lang.expr :=
+Fixpoint to_expr (e : expr) : pure.expr :=
   match e with
   | Val v e' _ => e'
-  | ClosedExpr e => e
-  | Var x => lang.Var x
-  | Lit l => lang.Lit l
-  | Rec f xl e => lang.Rec f xl (to_expr e)
-  | BinOp op e1 e2 => lang.BinOp op (to_expr e1) (to_expr e2)
-  | NdInt => lang.NdInt
-  | Rand e => lang.Rand (to_expr e)
-  | App e el => lang.App (to_expr e) (map to_expr el)
-  | Read e => lang.Read (to_expr e)
-  | Write e1 e2 => lang.Write (to_expr e1) (to_expr e2)
-  | Alloc e => lang.Alloc (to_expr e)
-  | Free e1 e2 => lang.Free (to_expr e1) (to_expr e2)
-  | Case e el => lang.Case (to_expr e) (map to_expr el)
+  | ClosedExpr e _ => e
+  | Var x => pure.Var x
+  | Lit l => pure.Lit l
+  | Rec f xl e => pure.Rec f xl (to_expr e)
+  | BinOp op e1 e2 => pure.BinOp op (to_expr e1) (to_expr e2)
+  | NdInt => pure.NdInt
+  | Rand e => pure.Rand (to_expr e)
+  | App e el => pure.App (to_expr e) (map to_expr el)
+  | Read e => pure.Read (to_expr e)
+  | Write e1 e2 => pure.Write (to_expr e1) (to_expr e2)
+  | Alloc e => pure.Alloc (to_expr e)
+  | Free e1 e2 => pure.Free (to_expr e1) (to_expr e2)
+  | Case e el => pure.Case (to_expr e) (map to_expr el)
   end.
 
 Ltac of_expr e :=
   lazymatch e with
-  | lang.Var ?x => constr:(Var x)
-  | lang.Lit ?l => constr:(Lit l)
-  | lang.Rec ?f ?xl ?e => let e := of_expr e in constr:(Rec f xl e)
-  | lang.BinOp ?op ?e1 ?e2 =>
+  | pure.Var ?x => constr:(Var x)
+  | pure.Lit ?l => constr:(Lit l)
+  | pure.Rec ?f ?xl ?e => let e := of_expr e in constr:(Rec f xl e)
+  | pure.BinOp ?op ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(BinOp op e1 e2)
-  | lang.NdInt => constr:(NdInt)
-  | lang.Rand ?e => let e := of_expr e in constr:(Rand e)
-  | lang.App ?e ?el =>
+  | pure.NdInt => constr:(NdInt)
+  | pure.Rand ?e => let e := of_expr e in constr:(Rand e)
+  | pure.App ?e ?el =>
     let e := of_expr e in let el := of_expr el in constr:(App e el)
-  | lang.Read ?e => let e := of_expr e in constr:(Read e)
-  | lang.Write ?e1 ?e2 =>
+  | pure.Read ?e => let e := of_expr e in constr:(Read e)
+  | pure.Write ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(Write e1 e2)
-  | lang.Alloc ?e => let e := of_expr e in constr:(Alloc e)
-  | lang.Free ?e1 ?e2 =>
+  | pure.Alloc ?e => let e := of_expr e in constr:(Alloc e)
+  | pure.Free ?e1 ?e2 =>
     let e1 := of_expr e1 in let e2 := of_expr e2 in constr:(Free e1 e2)
-  | lang.Case ?e ?el =>
+  | pure.Case ?e ?el =>
      let e := of_expr e in let el := of_expr el in constr:(Case e el)
-  | @nil lang.expr => constr:(@nil expr)
-  | @cons lang.expr ?e ?el =>
+  | @nil pure.expr => constr:(@nil expr)
+  | @cons pure.expr ?e ?el =>
     let e := of_expr e in let el := of_expr el in constr:(e::el)
   | to_expr ?e => e
   | of_val ?v => constr:(Val v (of_val v) (to_of_val v))
@@ -74,7 +74,7 @@ Ltac of_expr e :=
 
 Fixpoint is_closed (X : list string) (e : expr) : bool :=
   match e with
-  | Val _ _ _ | ClosedExpr _ => true
+  | Val _ _ _ | ClosedExpr _ _ => true
   | Var x => bool_decide (x ∈ X)
   | Lit _ | NdInt => true
   | Rec f xl e => is_closed (f :b: xl +b+ X) e
@@ -83,7 +83,7 @@ Fixpoint is_closed (X : list string) (e : expr) : bool :=
   | App e el | Case e el => is_closed X e && forallb (is_closed X) el
   | Read e | Alloc e | Rand e => is_closed X e
   end.
-Lemma is_closed_correct X e : is_closed X e → lang.is_closed X (to_expr e).
+Lemma is_closed_correct X e : is_closed X e → pure.is_closed X (to_expr e).
 Proof.
   revert e X. fix FIX 1; destruct e=>/=;
     try naive_solver eauto using is_closed_to_val, is_closed_weaken_nil.
@@ -113,13 +113,13 @@ Lemma to_val_is_Some e :
   is_Some (to_val e) → ∃ v, of_val v = to_expr e.
 Proof. intros [v ?]; exists v; eauto using to_val_Some. Qed.
 Lemma to_val_is_Some' e :
-  is_Some (to_val e) → is_Some (lang.to_val (to_expr e)).
+  is_Some (to_val e) → is_Some (pure.to_val (to_expr e)).
 Proof. intros [v ?]%to_val_is_Some. exists v. rewrite -to_of_val. by f_equal. Qed.
 
 Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   match e with
   | Val v e H => Val v e H
-  | ClosedExpr e => ClosedExpr e
+  | ClosedExpr e _ => ClosedExpr e
   | Var y => if bool_decide (y = x) then es else Var y
   | Lit l => Lit l
   | Rec f xl e =>
@@ -135,7 +135,7 @@ Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
   | Case e el => Case (subst x es e) (map (subst x es) el)
   end.
 Lemma to_expr_subst x er e :
-  to_expr (subst x er e) = lang.subst x (to_expr er) (to_expr e).
+  to_expr (subst x er e) = pure.subst x (to_expr er) (to_expr e).
 Proof.
   revert e x er. fix FIX 1; destruct e=>/= ? er; repeat case_bool_decide;
     f_equal; eauto using is_closed_nil_subst, is_closed_to_val, eq_sym.
@@ -150,18 +150,12 @@ Definition is_atomic (e: expr) : bool :=
     bool_decide (is_Some (to_val e1) ∧ is_Some (to_val e2))
   | _ => false
   end.
-Lemma is_atomic_correct e : is_atomic e → Atomic WeaklyAtomic (to_expr e).
-Proof.
-  intros He. apply ectx_language_atomic.
-  - intros σ e' σ' ef.
-    destruct e; simpl; try done; repeat (case_match; try done);
-    inversion 1; try (apply val_irreducible; rewrite ?language.to_of_val; naive_solver eauto).
-  - apply ectxi_language_sub_redexes_are_values=> /= Ki e' Hfill.
-    revert He. destruct e; simpl; try done; repeat (case_match; try done);
-    rewrite ?bool_decide_spec;
-    destruct Ki; inversion Hfill; subst; clear Hfill;
-    try naive_solver eauto using to_val_is_Some'.
-Qed.
+(** [is_atomic_correct] under clutch's [head_atomic] signature is a
+    follow-up — clutch's [Atomic] takes a probabilistic [prim_step] and
+    uses a different inversion shape than iris's. The lemma is unused
+    by the heap WP rules in [lifting.v] (which call
+    [wp_lift_atomic_head_step] directly), so we defer it. *)
+
 End W.
 
 Ltac solve_closed :=
@@ -189,13 +183,7 @@ Ltac solve_as_val :=
   end.
 Global Hint Extern 10 (AsVal _) => solve_as_val : typeclass_instances.
 
-Ltac solve_atomic :=
-  match goal with
-  | |- Atomic ?s ?e =>
-     let e' := W.of_expr e in change (Atomic s (W.to_expr e'));
-     apply W.is_atomic_correct; vm_compute; exact I
-  end.
-Global Hint Extern 0 (Atomic _ _) => solve_atomic : typeclass_instances.
+(** [solve_atomic]: deferred along with [W.is_atomic_correct]. *)
 
 (** Substitution *)
 Ltac simpl_subst :=
@@ -243,6 +231,7 @@ Ltac reshape_val e tac :=
 Ltac reshape_expr e tac :=
   let rec go_fun K f vs es :=
     match es with
+    | [] => idtac          (* All args are values; outer tac call already tried. *)
     | ?e :: ?es => reshape_val e ltac:(fun v => go_fun K f (v :: vs) es)
     | ?e :: ?es => go (AppRCtx f (reverse vs) es :: K) e
     end

@@ -72,20 +72,22 @@ src/lambda_verus/lang/lang.v
 #   in upstream clutch — see file header)
 src/lambda_verus/lang/lifting.v
 src/lambda_verus/lang/notation.v
-# src/lambda_verus/lang/proofmode.v
-# src/lambda_verus/lang/tactics.v
-# src/lambda_verus/lang/time.v
-# src/lambda_verus/lang/lib/new_delete.v
-# src/lambda_verus/lang/lib/memcpy.v
+src/lambda_verus/lang/proofmode.v
+src/lambda_verus/lang/tactics.v
+src/lambda_verus/lang/time.v
+src/lambda_verus/lang/lib/new_delete.v
+src/lambda_verus/lang/lib/memcpy.v
 
 # Type-specs
 
-# src/lambda_verus/typing/base.v
-# src/lambda_verus/typing/uniq_cmra.v
-# src/lambda_verus/typing/lifetime.v
-# src/lambda_verus/typing/lft_contexts.v
-# src/lambda_verus/typing/inv_context.v
-# src/lambda_verus/typing/type.v
+src/lambda_verus/typing/syn_type.v
+src/lambda_verus/typing/base.v
+src/lambda_verus/typing/lifetime.v
+src/lambda_verus/typing/lft_contexts.v
+# src/lambda_verus/typing/inv_context.v   (prophecy-tangled: open `2 goals
+#   focused` issue at line 131 + unresolved [ξ] references)
+# src/lambda_verus/typing/type.v   (Class typeG includes deeply prophecy-
+#   tangled fields and proofs throughout the file)
 # src/lambda_verus/typing/type_context.v
 # src/lambda_verus/typing/cont_context.v
 # src/lambda_verus/typing/cont.v
@@ -96,10 +98,9 @@ src/lambda_verus/lang/notation.v
 # src/lambda_verus/typing/bool.v
 # src/lambda_verus/typing/int.v
 # src/lambda_verus/typing/shr_bor.v
-# src/lambda_verus/typing/uniq_util.v
+# # src/lambda_verus/typing/uniq_util.v
 # src/lambda_verus/typing/ghost.v
-# src/lambda_verus/typing/uniq_bor.v
-# src/lambda_verus/typing/uninit.v
+# # src/lambda_verus/typing/uninit.v
 # src/lambda_verus/typing/freeable_util.v
 # src/lambda_verus/typing/own.v
 # src/lambda_verus/typing/pptr.v
@@ -108,7 +109,7 @@ src/lambda_verus/lang/notation.v
 # src/lambda_verus/typing/mod_ty.v
 # src/lambda_verus/typing/product_split.v
 # src/lambda_verus/typing/type_sum.v
-# src/lambda_verus/typing/borrow.v
+# # src/lambda_verus/typing/borrow.v
 # src/lambda_verus/typing/sum.v
 # src/lambda_verus/typing/ra.v
 # src/lambda_verus/typing/protocol.v
@@ -117,6 +118,8 @@ src/lambda_verus/lang/notation.v
 # src/lambda_verus/typing/base_type.v
 # src/lambda_verus/typing/fixpoint.v
 # src/lambda_verus/typing/soundness.v
+# Removed (prophecy-based, eris is unsound under prophecies): borrow.v,
+# uniq_bor.v, uniq_cmra.v, uniq_util.v.
 
 # src/lambda_verus/typing/examples/assert.v
 # src/lambda_verus/typing/examples/list.v

@@ -417,11 +417,9 @@ Proof.
   iSplitR "A Ho"; last first.
   - iModIntro. iLeft. eauto with iFrame lia.
   - iMod (inv_alloc with "[Ho2 Hx2 ⧗]") as "I1"; last first.
-    iMod (inv_alloc with "[Hc Hx B p c]") as "I2"; last first.
-    iModIntro. iSplit. 
-    { iFrame "I2". } 
-    { iFrame "I1". } 
-    { iFrame. 
-      iApply (lc_weaken with "Hc"). rewrite /advance_credits. nia. }
-    { iFrame. iNext. iExists 0%nat. by  iFrame. }
+    + iMod (inv_alloc with "[Hc Hx B p c]") as "I2"; last first.
+      * iModIntro. iSplit; [iFrame "I2" | iFrame "I1"].
+      * iFrame.
+        iApply (lc_weaken with "Hc"). rewrite /advance_credits. nia.
+    + iFrame. iNext. iExists 0%nat. by iFrame.
 Qed.

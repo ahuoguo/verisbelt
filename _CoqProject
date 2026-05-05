@@ -61,8 +61,9 @@ src/lambda_verus/util/cellmap.v
 src/lambda_verus/util/non_atomic_cell_map.v
 src/lambda_verus/util/atomic_lock_counter.v
 
-# src/lambda_verus/prophecy/syn_type.v
-# src/lambda_verus/prophecy/prophecy.v
+# Prophecy infrastructure removed: eris is unsound under prophecies
+# (Clutch POPL'24).  The typing layer below is stripped of prophecy
+# fields ([ty_guard_proph], [pt_non_prophetic], etc.).
 
 # Language definition (opsem and program logic)
 
@@ -71,6 +72,7 @@ src/lambda_verus/lang/lang.v
 # src/lambda_verus/lang/adequacy.v   (blocked on glm_erasure polymorphism
 #   in upstream clutch — see file header)
 src/lambda_verus/lang/lifting.v
+src/lambda_verus/lang/error_rules.v
 src/lambda_verus/lang/notation.v
 src/lambda_verus/lang/proofmode.v
 src/lambda_verus/lang/tactics.v
@@ -84,19 +86,24 @@ src/lambda_verus/typing/syn_type.v
 src/lambda_verus/typing/base.v
 src/lambda_verus/typing/lifetime.v
 src/lambda_verus/typing/lft_contexts.v
-# src/lambda_verus/typing/inv_context.v   (prophecy-tangled: open `2 goals
-#   focused` issue at line 131 + unresolved [ξ] references)
-# src/lambda_verus/typing/type.v   (Class typeG includes deeply prophecy-
-#   tangled fields and proofs throughout the file)
-# src/lambda_verus/typing/type_context.v
+src/lambda_verus/typing/inv_context.v
+src/lambda_verus/typing/proph_stubs.v
+src/lambda_verus/typing/type.v
+src/lambda_verus/typing/type_context.v
+src/lambda_verus/typing/cont_context.v
+src/lambda_verus/typing/programs.v
+src/lambda_verus/typing/bool.v
+src/lambda_verus/typing/int.v
+src/lambda_verus/typing/tracked.v
+src/lambda_verus/typing/rand_ubig.v
 # src/lambda_verus/typing/cont_context.v
-# src/lambda_verus/typing/cont.v
-# src/lambda_verus/typing/product.v
 # src/lambda_verus/typing/programs.v
-# src/lambda_verus/typing/programs_util.v
-# src/lambda_verus/typing/programs_util_own.v
 # src/lambda_verus/typing/bool.v
 # src/lambda_verus/typing/int.v
+# src/lambda_verus/typing/cont.v
+# src/lambda_verus/typing/product.v
+# src/lambda_verus/typing/programs_util.v
+# src/lambda_verus/typing/programs_util_own.v
 # src/lambda_verus/typing/shr_bor.v
 # # src/lambda_verus/typing/uniq_util.v
 # src/lambda_verus/typing/ghost.v

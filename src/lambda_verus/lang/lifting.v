@@ -11,7 +11,7 @@ From clutch.eris Require Export weakestpre.
 From clutch.eris Require Import ectx_lifting.
 From clutch.base_logic Require Export error_credits.
 From clutch.prob Require Import distribution.
-From lrust.lang Require Export lang.
+From lrust.lang Require Export lang time.
 From lrust.lang Require heap.   (* no Import: avoids iris WP notation clash *)
 From lrust.util Require Import update non_atomic_cell_map atomic_lock_counter.
 Set Default Proof Using "Type".
@@ -21,14 +21,22 @@ Open Scope Z_scope.
 
 (** [lrustGS] bundles the heap, lifetime/threadpool and atomic-lock-counter
     ghost state, an invariant interface (HasLc — required for eris's
-    hfupd-based adequacy) and eris's error-credit ghost state. *)
-Print invGS_gen.
+    hfupd-based adequacy), eris's error-credit ghost state, and the
+    time-receipt ghost state.
+
+    [timeGS] gives access to the persistent and cumulative time-receipt
+    resources [⧖n] / [⧗n] used by the typing layer to pay for the
+    later-credit cascade in nested [ty_gho] / [ty_gho_pers] depths.
+    The actual *minting* of credits via [wp_persistent_time_receipt]
+    relies on [HasLc] later credits — see [time.v] for the time-step
+    invariant and the credit-extraction lemmas. *)
 Class lrustGS Σ := LRustGS {
   lrustGS_invGS : invGS_gen HasLc Σ;
   #[global] lrustGS_na_invGS :: na_invG Σ;
   #[global] lrustGS_atomic_lock_ctr_invGS :: alc_logicG Σ;
   #[global] lrustGS_gen_heapGS :: heap.heapGS Σ;
   #[global] lrustGS_ecGS :: ecGS Σ;
+  #[global] lrustGS_gen_timeGS :: timeGS Σ;
 }.
 
 (** The plain [invGS] needed by [heap.v] is the same as [lrustGS_invGS]
@@ -254,10 +262,17 @@ Proof.
     rewrite dret_1_1 //.
 Qed.
 
-(** [pure_eq_int]: deferred — [bin_op_eval_fn EqOp (LitInt _) (LitInt _)]
-    goes through [(λ b, lit_of_bool b) <$> lit_eq_dec _ _]; the [<$>]
-    on [option] doesn't reduce under [simpl]/[cbn] without an explicit
-    rewrite chain we haven't worked out. *)
+Global Instance pure_eq_int z1 z2 :
+  PureExec True 1 (BinOp EqOp (Lit (LitInt z1)) (Lit (LitInt z2)))
+                  (Lit (lit_of_bool (bool_decide (z1 = z2)%Z))).
+Proof.
+  intros _. apply nsteps_once. apply pure_head_step_pure_step.
+  constructor.
+  - intros σ. eexists (_, σ). simpl.
+    destruct z1; cbn -[bool_decide]; by rewrite dret_1_1; first lra.
+  - intros σ. simpl.
+    destruct z1; cbn -[bool_decide]; by rewrite dret_1_1.
+Qed.
 
 Global Instance pure_plus z1 z2 :
   PureExec True 1 (BinOp PlusOp (Lit (LitInt z1)) (Lit (LitInt z2)))

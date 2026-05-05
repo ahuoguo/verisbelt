@@ -128,8 +128,8 @@ Section inv_contexts.
       { unfold cna_lifetimes. iFrame "multi". iApply guards_refl. }
       iSplit; last by done.
       replace (⊤) with (mask ∪ (⊤ ∖ mask)).
-       - rewrite cancellable_na_invariants.na_own_union. iDestruct "na_own" as "[$ _]".
-         set_solver.
+       - rewrite cancellable_na_invariants.na_own_union; [|set_solver].
+         iDestruct "na_own" as "[$ _]".
        - apply set_eq. intros x. destruct (decide (x ∈ mask)); set_solver.
   Qed.
 End inv_contexts.

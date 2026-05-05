@@ -1,6 +1,6 @@
 From iris.algebra Require Import numbers list dfrac_agree.
 From lrust.util Require Export basic vector update fancy_lists cancellable cancellable_na_invariants.
-From lrust.lang Require Export proofmode notation heap.
+From lrust.lang Require Export proofmode notation heap time.
 From lrust.typing Require Export base syn_type.
 From lrust.typing Require Export lft_contexts.
 From lrust.typing Require Export lifetime.
@@ -47,17 +47,9 @@ Record type `{!typeG Σ} 𝔄 := {
   ty_gho_pers_depth_mono d g d' g' x tid :
     (d ≤ d')%nat → (g ≤ g')%nat → ty_gho_pers x d g tid -∗ ty_gho_pers x d' g' tid;
   
-  ty_guard_proph κ x n d g tid ξ R :
-      ξ ∈ ξl x →
-      llft_ctx -∗
-      κ ⊑ lft_intersect_list ty_lfts -∗ 
-      (ty_gho_pers x d g tid) -∗
-      ▷^(d*(g+1)) (
-          (R &&{↑NllftG; n}&&> @[κ]) -∗
-          (R &&{↑NllftG; n}&&> ty_gho x d g tid) -∗
-          (R &&{↑NllftG; n + d*(g+1)}&&> 1:[ξ])
-      );
-  
+  (* [ty_guard_proph] field elided: prophecy infrastructure stripped
+     because eris is unsound under prophecies (Clutch POPL'24). *)
+
   ty_gho_pers_pers x d g tid :
       Persistent (ty_gho_pers x d g tid) ;
   ty_gho_pers_impl x d g tid :
@@ -234,18 +226,8 @@ Record simple_type `{!typeG Σ} 𝔄 := {
     (d ≤ d')%nat → (g ≤ g')%nat → st_gho x d g tid -∗
         st_gho x d' g' tid ;
         
-  st_guard_proph κ x n d g tid ξ R :
-      ξ ∈ ξl x →
-      llft_ctx -∗
-      κ ⊑ lft_intersect_list st_lfts -∗ 
-      st_gho x d g tid -∗
-      
-      ▷^(d*(g+1)) (
-          (R &&{↑NllftG; n}&&> @[κ]) -∗
-          (R &&{↑NllftG; n}&&> st_gho x d g tid) -∗
-          (R &&{↑NllftG; n + d*(g+1)}&&> 1:[ξ])
-      );
-      
+  (* [st_guard_proph] elided: prophecy stripped. *)
+
   st_concrete x tid : all_concrete (st_phys x tid) ;
 }.
 Global Existing Instance st_gho_persistent.
@@ -275,8 +257,6 @@ Next Obligation. move=> >. intros. iIntros "#A".
   iSplit. { by iApply st_gho_depth_mono. } iIntros "_". iFrame "A".
 Qed.
 Next Obligation. move=> >. intros. iIntros "#A". by iApply st_gho_depth_mono. Qed.
-Next Obligation. intros Σ typeG0 𝔄 st κ x n d g tid ξ R.
-    iIntros. iApply (st_guard_proph 𝔄 st κ x n d g tid ξ R); trivial; try iFrame. Qed.
 Next Obligation. move=> >. iIntros. iFrame "#". Qed.
 
 Coercion ty_of_st: simple_type >-> type.
@@ -293,7 +273,7 @@ Record plain_type `{!typeG Σ} 𝔄 := {
   pt_phys_eq2 x tid : syn_phys x = pt_phys x tid;
   pt_const : ∀ (x : ~~𝔄) π1 π2 , @vπ 𝔄 x π1 = @vπ 𝔄 x π2;
   pt_concrete x tid : all_concrete (pt_phys x tid);
-  pt_non_prophetic (x: ~~𝔄) : ξl x = [];
+  (* [pt_non_prophetic] elided: prophecy stripped. *)
 }.
 Global Existing Instance pt_gho_persistent.
 Global Instance: Params (@pt_size) 3 := {}.
@@ -314,8 +294,6 @@ Next Obligation. move=> >. apply pt_size_eq. Qed.
 Next Obligation. move=> >. apply pt_size_eq2. Qed.
 Next Obligation. move=> >. apply pt_phys_eq2. Qed.
 Next Obligation. iIntros. iFrame "#". Qed.
-Next Obligation. move=> >. intros Hin.
-  rewrite (pt_non_prophetic) in Hin; trivial. set_solver. Qed.
 Next Obligation. intros. apply pt_concrete. Qed.
 
 Coercion st_of_pt: plain_type >-> simple_type.
@@ -329,7 +307,7 @@ Bind Scope lrust_type_scope with type.
 Record ghost_type `{!typeG Σ} 𝔄 := {
   gt_gho : ~~𝔄 → thread_id → iProp Σ;
   gt_const : ∀ (x : ~~𝔄) π1 π2 , @vπ 𝔄 x π1 = @vπ 𝔄 x π2;
-  gt_non_prophetic (x: ~~𝔄) : @ξl 𝔄 x = [];
+  (* [gt_non_prophetic] elided: prophecy stripped. *)
   gt_size0 : size_of 𝔄 = 0;
   gt_phys0 (x: ~~𝔄) : @syn_phys 𝔄 x = [];
 }.
@@ -349,7 +327,6 @@ Next Obligation. move=> * //=. by rewrite gt_size0. Qed.
 Next Obligation. move=> * //=. by rewrite gt_phys0. Qed.
 Next Obligation. iIntros "**". iFrame. iIntros. done. Qed.
 Next Obligation. iIntros "**". iFrame. Qed.
-Next Obligation. move=> >. intros Hin. rewrite gt_non_prophetic in Hin; trivial. set_solver. Qed.
 Next Obligation. iIntros. done. Qed.
 
 Coercion ty_of_gt: ghost_type >-> type.
@@ -668,7 +645,7 @@ Proof.
   case=> [αT βst ET HTα HTE|αT ET HTα HTE]; case=> [αU βsU EU HUα HUE|αU EU HUα HUE].
   - apply (type_lft_morphism_add _ (αT ⊓ αU) (βst ++ βsU)
                                  (ET ++ EU ++ ((λ β, β ⊑ₑ αU) <$> βst)))=>ty.
-    + iApply lft_equiv_trans. iApply HTα. rewrite -assoc.
+    + iApply (lft_equiv_trans with "[]"); first iApply HTα. rewrite -assoc.
       iApply lft_intersect_equiv_proper; [iApply lft_equiv_refl|iApply HUα].
     + rewrite HTE HUE !elctx_interp_app big_sepL_app -!assoc.
       setoid_rewrite (lft_incl_equiv_proper_r _ _ _ (HUα _)). iSplit.
@@ -682,7 +659,7 @@ Proof.
         iIntros "!> * _ #[??]". by iApply llftl_incl_glb.
   - apply (type_lft_morphism_const _ (αT ⊓ αU)
             (ET ++ EU ++ ((λ β, β ⊑ₑ αU) <$> βst)))=>ty.
-    + iApply lft_equiv_trans. iApply HTα.
+    + iApply (lft_equiv_trans with "[]"); first iApply HTα.
       iApply lft_intersect_equiv_proper; [iApply lft_equiv_refl|iApply HUα].
     + rewrite HTE HUE !elctx_interp_app big_sepL_fmap.
       do 5 f_equiv. by apply lft_incl_equiv_proper_r.
@@ -827,7 +804,7 @@ Section type_contractive.
     TypeContractive (λ _: type 𝔅, ty).
   Proof. split; move=>// *. eright=> _; by [iApply lft_equiv_refl|]. Qed.
 
-  Global Instance id_type_ne {𝔄} : TypeNonExpansive (id: type 𝔄 → type 𝔄).
+  Global Instance id_type_ne {𝔄} : TypeNonExpansive (Datatypes.id : type 𝔄 → type 𝔄).
   Proof. split=>//. by apply type_lft_morphism_id_like. Qed.
 
   Global Instance type_list_non_expansive_nil {𝔄} :
@@ -865,18 +842,9 @@ Notation ListCopy := (TCHForall (λ 𝔄, @Copy _ _ 𝔄)).
 Class Send `{!typeG Σ} {𝔄} (ty: type 𝔄) := {
   send_change_tid_phys tid tid' x x' :
       @syn_abstract 𝔄 x = @syn_abstract 𝔄 x' → (ty.(ty_phys) x tid = ty.(ty_phys) x' tid');
-  send_change_tid tid tid' x d g G H κs d0 :
-    d + 1 ≤ d0 →
-    Timeless G →
-    Timeless H →
-    (llft_ctx -∗ uniq_ctx -∗ time_ctx -∗
-      (H &&{↑SendN}&&> cna_lifetimes tid κs) -∗ H -∗
-      (∀ (κ: lft) , ⌜κ ∈ κs⌝ -∗ (G &&{↑NllftG}&&> @[κ])) -∗ G -∗
-      ty.(ty_gho) x d g tid -∗ ⧖(d0) -∗
-      |={↑Nllft ∪ ↑SendN ∪ ↑nainvN ∪ ↑uniqN ∪ ↑timeN}▷=>^(d) |={↑Nllft ∪ ↑SendN ∪ ↑nainvN ∪ ↑uniqN ∪ ↑timeN}=>
-      ∃ x' off, 
-      ty.(ty_gho) x' (d+off) g tid' ∗ ⧖(d0+off) ∗ ⌜@syn_abstract 𝔄 x' = @syn_abstract 𝔄 x⌝ ∗ G ∗ H
-     )
+  (* [send_change_tid] field elided: it required prophecy contexts
+     ([uniq_ctx], [⟨π, ...⟩]) which are stripped because eris is unsound
+     under prophecies (Clutch POPL'24). *)
 }.
 Global Instance: Params (@Send) 3 := {}.
 
@@ -913,10 +881,8 @@ Section traits.
 
   Global Instance send_equiv {𝔄} : Proper ((≡) ==> impl) (Send (𝔄:=𝔄)).
   Proof.
-    move=> ?? [_ _ _ Eqv Eqv2 Eqv3] Hyp. destruct Hyp as [Hphys Hgho].
-    split.
-    - intros tid tid' x x'. rewrite -!Eqv3. apply Hphys.
-    - intros. setoid_rewrite <- Eqv. apply Hgho; trivial.
+    move=> ?? [_ _ _ _ _ Eqv3] Hyp. destruct Hyp as [Hphys].
+    split. intros tid tid' x x'. rewrite -!Eqv3. apply Hphys.
   Qed.
 
   Global Instance sync_equiv {𝔄} : Proper ((≡) ==> impl) (Sync (𝔄:=𝔄)).
@@ -940,54 +906,8 @@ Section traits.
     (∀ x tid, all_concrete (ty.(ty_phys) x tid)).
 End traits.
 
-(** * resolve *)
-
-Definition resolve `{!typeG Σ} {𝔄} (E: elctx) (L: llctx) (ty: type 𝔄) (Φ: ~~ 𝔄 → proph_asn → Prop) : Prop :=
-  ∀G F x d g tid, Timeless G → ↑Nllft ∪ ↑prophN ∪ ↑timeN ∪ ↑uniqN ⊆ F →
-    llft_ctx -∗ proph_ctx -∗ uniq_ctx -∗ time_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗
-    ty.(ty_gho) x d g tid ={F}=∗ |={F}▷=>^(d*(g+1)) |={F}=> ⟨π, Φ x π⟩ ∗ G.
-Global Instance: Params (@resolve) 3 := {}.
-
-Definition resolvel `{!typeG Σ} {𝔄l} (E: elctx) (L: llctx) (tyl: typel 𝔄l)
-                 (Φl: plist (λ 𝔄, ~~ 𝔄 → proph_asn → Prop) 𝔄l) : Prop :=
-  HForall_1 (λ _, resolve E L) tyl Φl.
-
-Definition resolve' `{!typeG Σ} {𝔄} (E: elctx) (L: llctx) (ty: type 𝔄)
-                 (Φ: ~~ 𝔄 → proph_asn → Prop → Prop) :=
-  resolve E L ty (λ a π, ∀φ, Φ a π φ → φ).
-
-Section resolve.
-  Context `{!typeG Σ}.
-
-  Lemma resolve_just {𝔄} (ty: type 𝔄) E L : resolve E L ty (const (const True)).
-  Proof.
-    move=> > ?. iIntros "_ _ _ _ _ _ $ _!>". iApply step_fupdN_full_intro.
-    by iApply proph_obs_true.
-  Qed.
-
-  Lemma resolve_impl {𝔄} (ty: type 𝔄) E L (Φ Φ': ~~𝔄 → proph_asn → Prop) :
-    resolve E L ty Φ → (∀a π, Φ a π → Φ' a π) → resolve E L ty Φ'.
-  Proof.
-    move=> Rslv Imp > ?. iIntros "LFT PROPH UNIQ TIME E #L G ty".
-    iMod (Rslv with "LFT PROPH UNIQ TIME E L G ty") as "ToObs"; [done|].
-    iApply (step_fupdN_wand with "ToObs"). iIntros "!> >[? $] !>".
-    iApply proph_obs_impl; [|done]=>/= ?. apply Imp.
-  Qed.
-
-  Lemma resolvel_nil E L : resolvel E L +[] -[].
-  Proof. constructor. Qed.
-  Lemma resolvel_cons {𝔄 𝔄l} E L (ty: type 𝔄) (tyl: typel 𝔄l) Φ Φl :
-    resolve E L ty Φ → resolvel E L tyl Φl → resolvel E L (ty +:: tyl) (Φ -:: Φl).
-  Proof. by constructor. Qed.
-
-  Lemma resolve'_post {𝔄} (ty: type 𝔄) E L Φ :
-    resolve E L ty Φ → resolve' E L ty (λ a π φ, Φ a π → φ).
-  Proof. move=> ?. eapply resolve_impl; [done|]=>/= ???? Imp. by apply Imp. Qed.
-
-  Lemma resolve'_just {𝔄} (ty: type 𝔄) E L Φ :
-    resolve E L ty (const Φ) → resolve' E L ty (const (const id)).
-  Proof. move=> _. by eapply resolve_impl; [apply resolve_just|]=>/=. Qed.
-End resolve.
+(** [resolve] / [resolvel] / [resolve'] removed: they required
+    prophecy contexts which are unsound under eris. *)
 
 (** * Subtyping *)
 
@@ -1081,12 +1001,11 @@ Section subtyping.
       ⌜∀vπ tid, ty.(ty_phys) vπ tid = ty'.(ty_phys) vπ tid⌝)) ↔
     eqtype E L ty ty' idₛ idₛ.
   Proof. split.
-    + intros X. apply eqtype_unfold.
-        - done.
-        - iIntros "L". iDestruct (X with "L") as "#Q".
-          iModIntro. iIntros "E". iDestruct ("Q" with "E") as "[B [C [D [E F]]]]".
-          iFrame.
-    + intros X. rewrite <- eqtype_unfold in X. apply X. done.
+    + intros X. apply eqtype_unfold; first done.
+        iIntros "L". iDestruct (X with "L") as "#Q".
+        iModIntro. iIntros "E". iDestruct ("Q" with "E") as "[B [C [D [E F]]]]".
+        iFrame.
+    + intros X. rewrite <- eqtype_unfold in X; [|done]. by apply X.
   Qed.
 
   Global Instance type_incl_ne {𝔄 𝔅} n :
@@ -1326,20 +1245,7 @@ Section subtyping.
     by iApply type_incl_ghost_type.
   Qed.
 
-  (** resolve *)
-
-  Lemma resolve_subtype {𝔄 𝔅} E L (ty: type 𝔄) (ty': type 𝔅) f Φ :
-    subtype E L ty ty' f → resolve E L ty' Φ → resolve E L ty (Φ ∘ ~~!ₛ f).
-  Proof.
-    iIntros (Sub Rslv) "* LFT PROPH UNIQ TIME E #L G ty".
-    leaf_open "L" with "G" as "[L1 back]". { solve_ndisj. }
-    iDestruct (Sub with "L1") as "#Sub".
-    iMod ("back" with "L1") as "G".
-    iDestruct ("Sub" with "E") as "#(_ & _ & #InOwn & _)".
-    iDestruct ("InOwn" with "ty") as "[ty' _]".
-    unfold "∘".
-    by iApply (Rslv with "LFT PROPH UNIQ TIME E L G ty'").
-  Qed.
+  (** [resolve_subtype] removed along with [resolve]. *)
 End subtyping.
 
 (** * Utility *)
@@ -1430,14 +1336,11 @@ Section type_util.
 End type_util.
 
 Global Hint Resolve ty_outlives_E_elctx_sat tyl_outlives_E_elctx_sat : lrust_typing.
-Global Hint Resolve resolve'_post | 5 : lrust_typing.
-Global Hint Resolve resolvel_nil resolve'_just
-  subtype_refl eqtype_refl subtypel_nil eqtypel_nil : lrust_typing.
+Global Hint Resolve subtype_refl eqtype_refl subtypel_nil eqtypel_nil : lrust_typing.
 (* We use [Hint Extern] instead of [Hint Resolve] here, because
-  [resolvel_cons], [subtypel_cons] and [eqtypel_cons]
+  [subtypel_cons] and [eqtypel_cons]
   work with [apply] but not with [simple apply] *)
-Global Hint Extern 0 (resolvel _ _ _ _) => apply resolvel_cons : lrust_typing.
 Global Hint Extern 0 (subtypel _ _ _ _ _) => apply subtypel_cons : lrust_typing.
 Global Hint Extern 0 (eqtypel _ _ _ _ _ _) => apply eqtypel_cons : lrust_typing.
 
-Global Hint Opaque resolve resolve' subtype eqtype : lrust_typing.
+Global Hint Opaque subtype eqtype : lrust_typing.

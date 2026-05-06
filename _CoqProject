@@ -69,8 +69,7 @@ src/lambda_verus/util/atomic_lock_counter.v
 
 src/lambda_verus/lang/heap.v
 src/lambda_verus/lang/lang.v
-# src/lambda_verus/lang/adequacy.v   (blocked on glm_erasure polymorphism
-#   in upstream clutch — see file header)
+src/lambda_verus/lang/adequacy.v
 src/lambda_verus/lang/lifting.v
 src/lambda_verus/lang/error_rules.v
 src/lambda_verus/lang/notation.v

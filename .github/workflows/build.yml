@@ -39,15 +39,10 @@ jobs:
               opam install --confirm-level=unsafe-yes -j 2 $PACKAGE \
                 --deps-only --ignore-constraints-on=rocq-stdpp
             endGroup
-          before_script: |
-            sudo chown -R 1000:1000 .
           script: |
             startGroup Build
               make -j2
             endGroup
           uninstall: |
             make clean
-      - name: Revert permissions
-        # to avoid a warning at cleanup time
-        if: ${{ always() }}
-        run: sudo chown -R 1001:116 .
+

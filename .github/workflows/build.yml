@@ -33,7 +33,9 @@ jobs:
           custom_image: ${{ matrix.image }}
           install: |
             startGroup "Pin VerusBelt-specific dependencies"
+              apt-get install rsync -y
               opam pin add -n -y -k path $PACKAGE $WORKDIR
+              opam reinstall --forget-pending --yes
               opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only
             endGroup
           before_script: |

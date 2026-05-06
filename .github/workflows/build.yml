@@ -14,29 +14,30 @@ jobs:
     strategy:
       matrix:
         image:
-          - rocq/rocq-prover:9.1.1-ocaml-4.14.2-flambda
+          - ghcr.io/logsem/clutch/docker-x86-64
       max-parallel: 4
       # don't cancel all in-progress jobs if one matrix job fails:
       fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: coq-community/docker-coq-action@v1
         with:
           opam_file: 'rocq-verusbelt.opam'
           custom_image: ${{ matrix.image }}
           install: |
-            startGroup "Configure opam repositories"
-              opam repo add --this-switch rocq-released https://rocq-prover.org/opam/released || true
-              opam repo add --this-switch iris-dev https://gitlab.mpi-sws.org/iris/opam.git || true
-              opam update -y
-            endGroup
-            startGroup "Install VerusBelt dependencies"
+            startGroup "Pin VerusBelt-specific dependencies"
               opam pin add -n -y -k path $PACKAGE $WORKDIR
               opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only
             endGroup
           before_script: |
-            sudo chown -R 1000:1000 .  
+            sudo chown -R 1000:1000 .
           script: |
             startGroup Build
               make -j2

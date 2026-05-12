@@ -76,33 +76,45 @@ Section typing.
         llctx_interp L ∗ invctx_interp tid mask' iκs I' ∗ tctx_interp tid (T' v) xl' ∗ ⌜post xl' mask'⌝ }}.
   Global Arguments typed_instr {_ _} _ _ _ _ _%E _ _%type.
 
-  (** Writing and Reading *)
+  (** Writing and Reading.
+
+      The original verusbelt definitions wrapped the heap mapsto in a
+      leaf-guard ([H &&{↑NllftG; d+1}&&> l #↦∗_]) to handle the
+      [WriteNa1S]/[WriteNa2S] two-step protocol's intermediate cell
+      states (visible to other threads via the cell-level [#↦∗_]
+      abstraction).  Since concurrency was stripped (Scope C),
+      [Write]/[Read] are single-step atomic ([lang.v:759-769]) — no
+      thread can witness an intermediate state, so the leaf-guard
+      collapses.  The simplified definitions use [heap_mapsto_vec l]
+      (loc-level, what [wp_write]/[wp_read] in [lifting.v] actually
+      consume) directly. *)
 
   Definition typed_write {𝔄 𝔅 𝔄' 𝔅'} (E: elctx) (L: llctx) (ty: type 𝔄) (tyb: type 𝔅)
     (ty': type 𝔄') (tyb': type 𝔅') (gt: ~~𝔄 → ~~𝔅) (st: ~~𝔄 → ~~𝔅' → ~~𝔄' → Prop) : Prop :=
     tyb.(ty_size) = tyb'.(ty_size) ∧ ∀x d (v: fancy_val) tid G,
     Timeless G →
     llft_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗
-    G -∗ ty_own ty x d d tid [v] ={⊤}=∗ ∃(l: cloc) (d':nat) (H: iProp Σ),
-      ⌜v = FVal #(l.1)⌝ ∗ ⌜d = S d'⌝ ∗ ▷ l #↦!∗: ty_own tyb (gt x) d' d tid ∗
-      H ∗ (H &&{↑NllftG; d+1}&&> l #↦∗_) ∗
-      ∀y db', ▷ l #↦!∗: ty_own tyb' y db' (S db') tid -∗ ⧖(S db') -∗
-        £(2*db'*db' + 4*db' + 2) -∗ H
+    G -∗ ty_own ty x d d tid [v] ={⊤}=∗ ∃(l: loc) (d':nat) (vl: list val),
+      ⌜v = FVal #l⌝ ∗ ⌜d = S d'⌝ ∗
+      ▷ heap.heap_mapsto_vec l vl ∗
+      ▷ ty_own tyb (gt x) d' d tid (FVal <$> vl) ∗
+      ∀y db' (vl': list val),
+        heap.heap_mapsto_vec l vl' -∗
+        ▷ ty_own tyb' y db' (S db') tid (FVal <$> vl') -∗
+        ⧖(S db') -∗ £(2*db'*db' + 4*db' + 2)
         ={⊤}=∗ ∃z, G ∗ ⌜st x y z⌝ ∗ ty_own ty' z (S db') (d `max` S db') tid [v].
   Global Arguments typed_write {_ _ _ _} _ _ _%T _%T _%T _%T _%type _%type.
 
   Definition typed_read {𝔄 𝔅 𝔄'} (E: elctx) (L: llctx) (ty: type 𝔄) (tyb: type 𝔅)
     (ty': type 𝔄') (gt: ~~𝔄 → ~~𝔅) (st: ~~𝔄 → ~~𝔄' → Prop) : Prop := ∀x d v tid G,
     Timeless G →
-    llft_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗ 
-    ty_own ty x d d tid [v] -∗ £(d+1) ={⊤ ∖ ↑advN}=∗
-      ∃(l: cloc) (vl_concrete: list val) (vl: list fancy_val) H, ⌜v = FVal #(l.1)⌝ ∗
-        ⌜length vl_concrete = length vl⌝ ∗
-        H ∗ (H &&{↑NllftG; d+1}&&> (l.1 ↦[^ l.2]∗ vl_concrete)) ∗
-        (∀ l₁ c₁ , (l₁, c₁) #↦∗_ ∗ (l₁, c₁) #↦∗ vl_concrete ={∅}=∗ (l₁, c₁) #↦∗_ ∗ (l₁, c₁) #↦!∗ vl) ∗
-        ⌜StackOkay tyb → vl = fmap FVal vl_concrete⌝ ∗
-        ▷ ty_own tyb (gt x) d d tid vl ∗ (H ={⊤ ∖ ↑advN}=∗
-          ∃ z, ⌜st x z⌝ ∗ G ∗ ty_own ty' z d d tid [v]).
+    llft_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗
+    ty_own ty x d d tid [v] -∗ £(d+1) ={⊤}=∗
+      ∃(l: loc) (vl: list val), ⌜v = FVal #l⌝ ∗
+        heap.heap_mapsto_vec l vl ∗
+        ▷ ty_own tyb (gt x) d d tid (FVal <$> vl) ∗
+        (heap.heap_mapsto_vec l vl ={⊤}=∗
+          ∃z, ⌜st x z⌝ ∗ G ∗ ty_own ty' z d d tid [v]).
   Global Arguments typed_read {_ _ _} _ _ _%T _%T _%T _ _%type.
 
   Definition typed_instr_ty {𝔄l 𝔅} (E: elctx) (L: llctx) (I: invctx)
@@ -286,17 +298,44 @@ Section typing.
     destruct Extr as [Htrx _]=>?? /=. apply Htrx. by case.
   Qed.
   
-  (** [type_assign_instr], [type_assign] removed: they used [resolve']
-      to discard the previous heap value, which depended on prophecy. *)
-  
-  (** [type_deref_instr] / [type_deref] removed: their proofs require
-      [wp_persistent_time_receipt] / [wp_read_na_guarded_cells_singleton]
-      and the prophecy-tangled [typed_read] semantics, neither of
-      which survived the prophecy strip.  Re-introduce when the
-      heap/time-receipt machinery is restored. *)
+  (** [type_assign_instr] / [type_deref_instr] / [type_memcpy_instr]:
+      not yet ported.
 
-  (** [type_memcpy_instr], [type_memcpy] removed: they used [resolve']
-      to discard the previous heap value, which depended on prophecy. *)
+      The infrastructure is now in place to do this:
+      - [typed_write] / [typed_read] above are simplified to use
+        [heap_mapsto_vec] (loc-level) directly, dropping the
+        leaf-guard `H &&{N;d+1}&&> l #↦∗_` (which only existed to
+        handle the [WriteNa1S]/[WriteNa2S] two-step protocol's
+        observable intermediate states; concurrency stripped in
+        Scope B makes the guard unnecessary).
+      - [wp_persistent_time_receipt_lc] in [lang/lifting.v]
+        provides the [⧖n → ⧖(S n) ∗ £(advance_credits n)] step
+        used by the heap-rule proofs.
+      - [wp_write] / [wp_read] in [lang/lifting.v] are usable
+        directly (no [wp_write_na_guarded] wrapper needed).
+
+      What still needs design choices to land cleanly:
+
+      1. **[⧗] threading.** [wp_persistent_time_receipt_lc] consumes
+         one [⧗1] per use.  The rule needs to acquire that [⧗1]
+         from somewhere — either threaded through [typed_body] /
+         [typed_instr] (typing-layer-wide change), or carried as a
+         tctx entry, or supplied as an explicit iProp premise to
+         each heap-rule lemma (clients pre-allocate a [⧗]-pool at
+         adequacy time).
+      2. **Mapsto-fancy bridging.** [typed_write] now hands back
+         [heap_mapsto_vec l vl] and [▷ ty_own tyb _ _ _ (FVal <$> vl)],
+         while the [tyb'] from [wp_hasty pb] uses
+         [ty_own tyb' y db' db' tid [FVal vb]] (singleton).  The
+         proof needs [length vl = 1] (from the size constraint)
+         and to convert `[vb]` into a list-valued shape matching
+         the closer.  Mechanical, but a few rewrites.
+
+      Once those two are settled, the proof body is a
+      straightforward port of the original (already present in
+      verusbelt's pre-strip [programs.v]) with [wp_write] in place
+      of [wp_write_na_guarded] and [wp_persistent_time_receipt_lc]
+      in place of [wp_persistent_time_receipt]. *)
 End typing.
 
 Ltac via_tr_impl :=

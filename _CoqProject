@@ -123,7 +123,7 @@ src/lambda_verus/typing/rand_ubig.v
 # src/lambda_verus/typing/function.v
 # src/lambda_verus/typing/base_type.v
 # src/lambda_verus/typing/fixpoint.v
-# src/lambda_verus/typing/soundness.v
+src/lambda_verus/typing/soundness.v
 # Removed (prophecy-based, eris is unsound under prophecies): borrow.v,
 # uniq_bor.v, uniq_cmra.v, uniq_util.v.
 

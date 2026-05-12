@@ -63,7 +63,7 @@ Section error_rules.
   Proof.
     iIntros (?) "[Herr Hwp]".
     iApply wp_lift_step_fupd_glm; [done|].
-    iIntros (σ1 ε2) "[Hσ1 Hε2]".
+    iIntros (ns σ1 ε2) "[Hσ1 Hε2]".
     iApply fupd_mask_intro; [set_solver|].
     iIntros "Hclose'".
     iApply glm_err_incr_step.
@@ -126,7 +126,7 @@ Section error_rules.
     assert (forall n, 0 <= ε2 n)%R as Hleq1 by (intros; apply Hleq).
     assert (forall n, ε2 n <= 1)%R as Hleq2 by (intros; apply Hleq).
     iApply wp_lift_step_fupd_glm; [done|].
-    iIntros (σ1 ε_now) "[Hσ Hε]".
+    iIntros (ns σ1 ε_now) "[[Hσ Ht] Hε]".
     iApply fupd_mask_intro; [set_solver|].
     iIntros "Hclose'".
     iApply glm_adv_comp; simpl.
@@ -327,7 +327,8 @@ Section error_rules.
     { simpl. lra. }
     { iApply ec_supply_eq; [|done]. simplify_eq. lra. }
     iMod "Hclose'".
-    iApply fupd_mask_intro; [eauto|]. iIntros "_". iFrame.
+    iMod (time_interp_step with "Ht") as "Ht".
+    iApply fupd_mask_intro; [eauto|]. iIntros "_". iFrame "Hσ Ht Hε2".
     replace (Lit (LitInt n)) with (of_val (LitV (LitInt n))) by reflexivity.
     iApply pgl_wp_value'.
     replace (LitV (LitInt n)) with (LitV (LitInt (Z.of_nat (Z.to_nat n)))); last first.

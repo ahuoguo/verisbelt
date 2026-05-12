@@ -44,12 +44,23 @@ Class lrustGS Σ := LRustGS {
 Global Instance lrustGS_invGS_inst `{!lrustGS Σ} : invGS Σ
   := lrustGS_invGS.
 
+(** [state_interp n σ] bundles the heap with the per-step
+    [time_interp n] component.  The step index [n] is advanced by
+    the WP framework on each [prim_step] (eris-lc threads it
+    through [pgl_wp_pre]).  This is what lets
+    [wp_cumulative_time_receipt1] / [wp_persistent_time_receipt]
+    open [time_ctx] under a step and extract a fresh [⧗1] /
+    [⧖(d+1)] from [step_cumulative_time_receipt]. *)
 Global Program Instance lrustGS_erisWpGS `{!lrustGS Σ} :
   erisWpGS lrust_prob_lang Σ := {
   erisWpGS_invGS := lrustGS_invGS;
-  state_interp σ := heap.heap_ctx σ;
+  state_interp n σ := (heap.heap_ctx σ ∗ time_interp n)%I;
   err_interp ε := ec_supply ε;
 }.
+Next Obligation.
+  iIntros (Σ ? n σ) "[$ Ht]".
+  iMod (time_interp_step with "Ht") as "$". done.
+Qed.
 
 Global Opaque lrustGS_invGS.
 
@@ -69,7 +80,7 @@ Section lifting.
   Proof.
     iIntros (HN) "HΦ".
     iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1) "Hσ". iApply fupd_mask_intro; first set_solver.
+    iIntros (ns σ1) "[Hσ Ht]". iApply fupd_mask_intro; first set_solver.
     iIntros "Hclose". iSplit.
     { iPureIntro. rewrite /head_reducible /=.
       rewrite bool_decide_eq_true_2 //.
@@ -79,7 +90,8 @@ Section lifting.
     rewrite /ectx_language.head_step /= /head_step_prob /= in Hstep.
     rewrite bool_decide_eq_true_2 in Hstep; last done.
     apply dmap_pos in Hstep as (n & [= -> ->] & _).
-    iModIntro. iFrame. by iApply "HΦ".
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hσ Ht". by iApply "HΦ".
   Qed.
 
   (** [Alloc]: fresh-block allocation. *)
@@ -92,7 +104,7 @@ Section lifting.
   Proof.
     iIntros (Hn Φ) "_ HΦ".
     iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1) "Hσ".
+    iIntros (ns σ1) "[Hσ Ht]".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
     iSplit.
     { iPureIntro. rewrite /head_reducible /=.
@@ -107,7 +119,8 @@ Section lifting.
       assert (fresh_loc σ1 +ₗ m = (fresh_block σ1, m)) as ->;
         [rewrite /fresh_loc /shift_loc /=; f_equal; lia|].
       apply is_fresh_block. }
-    iModIntro. iFrame "Hσ".
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hσ Ht".
     iApply ("HΦ" $! _ (Z.to_nat n)). iFrame. iPureIntro. lia.
   Qed.
 
@@ -119,7 +132,7 @@ Section lifting.
   Proof.
     iIntros (HE Φ) ">Hl HΦ".
     iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1) "Hσ". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
+    iIntros (ns σ1) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
     iMod (non_atomic_cell_map.points_to_heap_reading0 with "Hl Hh")
       as "(Hl & Hh & %Hσl)"; [done|].
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
@@ -129,7 +142,8 @@ Section lifting.
     iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
     rewrite /ectx_language.head_step /= /head_step_prob /= Hσl in Hstep.
     apply dret_pos in Hstep as [= -> ->].
-    iModIntro. iSplitL "Hh Hf ato"; [iExists hF; by iFrame|].
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iSplitL "Hh Hf ato Ht"; [iSplitR "Ht"; [iExists hF; by iFrame|by iFrame]|].
     rewrite language.to_of_val /=. by iApply ("HΦ" with "Hl").
   Qed.
 
@@ -141,7 +155,7 @@ Section lifting.
   Proof.
     iIntros (HE Φ) ">Hl HΦ".
     iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1) "Hσ". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
+    iIntros (ns σ1) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
     iMod (non_atomic_cell_map.atomic_write _ _ _ v' with "Hl Hh")
       as "(%Hσl & Hl & Hh)"; [done|].
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
@@ -151,8 +165,9 @@ Section lifting.
     iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
     rewrite /ectx_language.head_step /= /head_step_prob /= to_of_val Hσl in Hstep.
     apply dret_pos in Hstep as [= -> ->].
-    iModIntro. iSplitL "Hh Hf ato".
-    { iExists hF. iFrame.
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iSplitL "Hh Hf ato Ht".
+    { iSplitR "Ht"; last by iFrame. iExists hF. iFrame.
       iPureIntro. eauto using heap.heap_freeable_rel_stable. }
     by iApply ("HΦ" with "Hl").
   Qed.
@@ -167,7 +182,7 @@ Section lifting.
   Proof.
     iIntros (HE Hn Φ) "[>Hl >Hf] HΦ".
     iApply wp_lift_atomic_head_step; [done|].
-    iIntros (σ1) "Hσ".
+    iIntros (ns σ1) "[Hσ Ht]".
     iMod (heap.heap_free with "Hσ Hl Hf") as "(%Hpos & %Hbnd & Hσ)"; [done..|].
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
     iSplit.
@@ -178,7 +193,43 @@ Section lifting.
     rewrite /ectx_language.head_step /= /head_step_prob /= in Hstep.
     rewrite bool_decide_eq_true_2 in Hstep; last done.
     apply dret_pos in Hstep as [= -> ->].
-    iModIntro. iFrame "Hσ". by iApply "HΦ".
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hσ Ht". by iApply "HΦ".
+  Qed.
+
+  (** A persistent-time-receipt-shaped primitive that uses the new
+      step-counter exposure in [state_interp] to bump [⧖n] across a
+      WP step.
+
+      The original [step_cumulative_time_receipt] (in [lang/time.v])
+      was designed for iris-WP's per-step
+      [£(sum_advance_credits (ns+1))] later-credit endowment; in
+      [pgl_wp]/HasLc each step gives [£1] only, which can't pay the
+      exponential closer.  This lemma provides a simpler alternative:
+      it consumes one already-existing [⧗1] (cumulative time
+      receipt — usually pre-allocated at adequacy time) to bump
+      [⧖n] to [⧖(S n)] inside a WP step and additionally returns
+      [£1] (the natural per-step later credit, accessed via the
+      fupd-around-step pattern of [pgl_wp_step_fupd]).
+
+      No exponential credit budget needed.  The cost is that each
+      use of this lemma consumes one [⧗1] from the pool the user
+      manages externally. *)
+  Lemma wp_persistent_time_receipt_lc n E e Φ s :
+    ↑timeN ⊆ E →
+    time_ctx -∗ 
+    ⧖n -∗ 
+    ⧗1 -∗
+    (⧖(S n) -∗ £(advance_credits n) -∗ WP e @ s; E {{ Φ }}) -∗
+    WP e @ s; E {{ Φ }}.
+  Proof.
+    iIntros (Hmask) "#TIME #⧖n ⧗1 Hwp".
+    iApply fupd_pgl_wp.
+    iMod (cumulative_persistent_time_receipt_get_credits with "TIME ⧗1 ⧖n")
+      as "[#⧖Sn H£]"; first done.
+    iModIntro.
+    replace (n + 1)%nat with (S n) by lia.
+    by iApply ("Hwp" with "⧖Sn H£").
   Qed.
 
 End lifting.

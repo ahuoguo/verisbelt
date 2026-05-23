@@ -104,7 +104,7 @@ src/lambda_verus/typing/product.v
 # src/lambda_verus/typing/shr_bor.v
 # # src/lambda_verus/typing/uniq_util.v
 # src/lambda_verus/typing/ghost.v
-# src/lambda_verus/typing/uninit.v
+src/lambda_verus/typing/uninit.v
 src/lambda_verus/typing/freeable_util.v
 src/lambda_verus/typing/own.v
 # src/lambda_verus/typing/pptr.v

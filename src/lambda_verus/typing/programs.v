@@ -1,6 +1,6 @@
 From iris.proofmode Require Import environments proofmode.
 From lrust.lang Require Import proofmode memcpy.
-From lrust.typing Require Export type lft_contexts type_context cont_context inv_context proph_stubs.
+From lrust.typing Require Export type lft_contexts type_context cont_context inv_context.
 From lrust.lifetime Require Import lifetime_full.
 From guarding Require Import guard tactics.
 Set Default Proof Using "Type".
@@ -76,32 +76,23 @@ Section typing.
         llctx_interp L ∗ invctx_interp tid mask' iκs I' ∗ tctx_interp tid (T' v) xl' ∗ ⌜post xl' mask'⌝ }}.
   Global Arguments typed_instr {_ _} _ _ _ _ _%E _ _%type.
 
-  (** Writing and Reading.
-
-      The original verusbelt definitions wrapped the heap mapsto in a
-      leaf-guard ([H &&{↑NllftG; d+1}&&> l #↦∗_]) to handle the
-      [WriteNa1S]/[WriteNa2S] two-step protocol's intermediate cell
-      states (visible to other threads via the cell-level [#↦∗_]
-      abstraction).  Since concurrency was stripped (Scope C),
-      [Write]/[Read] are single-step atomic ([lang.v:759-769]) — no
-      thread can witness an intermediate state, so the leaf-guard
-      collapses.  The simplified definitions use [heap_mapsto_vec l]
-      (loc-level, what [wp_write]/[wp_read] in [lifting.v] actually
-      consume) directly. *)
+  (** Writing and Reading — upstream verisbelt shape.  The closer
+      receives an abstract [H : iProp Σ] gated by a leaf-guard
+      [H &&{↑NllftG; d+1}&&> l #↦∗_].  Cell-level reads/writes through
+      this guard are mediated by [wp_write_guarded] /
+      [wp_read_guarded] in [lang/lifting.v] (built on top of
+      [heap_write] / [heap_read] in [lang/heap.v]). *)
 
   Definition typed_write {𝔄 𝔅 𝔄' 𝔅'} (E: elctx) (L: llctx) (ty: type 𝔄) (tyb: type 𝔅)
     (ty': type 𝔄') (tyb': type 𝔅') (gt: ~~𝔄 → ~~𝔅) (st: ~~𝔄 → ~~𝔅' → ~~𝔄' → Prop) : Prop :=
     tyb.(ty_size) = tyb'.(ty_size) ∧ ∀x d (v: fancy_val) tid G,
     Timeless G →
     llft_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗
-    G -∗ ty_own ty x d d tid [v] ={⊤}=∗ ∃(l: loc) (d':nat) (vl: list val),
-      ⌜v = FVal #l⌝ ∗ ⌜d = S d'⌝ ∗
-      ▷ heap.heap_mapsto_vec l vl ∗
-      ▷ ty_own tyb (gt x) d' d tid (FVal <$> vl) ∗
-      ∀y db' (vl': list val),
-        heap.heap_mapsto_vec l vl' -∗
-        ▷ ty_own tyb' y db' (S db') tid (FVal <$> vl') -∗
-        ⧖(S db') -∗ £(2*db'*db' + 4*db' + 2)
+    G -∗ ty_own ty x d d tid [v] ={⊤}=∗ ∃(l: cloc) (d':nat) (H: iProp Σ),
+      ⌜v = FVal #(l.1)⌝ ∗ ⌜d = S d'⌝ ∗ ▷ l #↦!∗: ty_own tyb (gt x) d' d tid ∗
+      H ∗ (H &&{↑NllftG; d+1}&&> l #↦∗_) ∗
+      ∀y db', ▷ l #↦!∗: ty_own tyb' y db' (S db') tid -∗ ⧖(S db') -∗
+        £(2*db'*db' + 4*db' + 2) -∗ H
         ={⊤}=∗ ∃z, G ∗ ⌜st x y z⌝ ∗ ty_own ty' z (S db') (d `max` S db') tid [v].
   Global Arguments typed_write {_ _ _ _} _ _ _%T _%T _%T _%T _%type _%type.
 
@@ -109,12 +100,14 @@ Section typing.
     (ty': type 𝔄') (gt: ~~𝔄 → ~~𝔅) (st: ~~𝔄 → ~~𝔄' → Prop) : Prop := ∀x d v tid G,
     Timeless G →
     llft_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗
-    ty_own ty x d d tid [v] -∗ £(d+1) ={⊤}=∗
-      ∃(l: loc) (vl: list val), ⌜v = FVal #l⌝ ∗
-        heap.heap_mapsto_vec l vl ∗
-        ▷ ty_own tyb (gt x) d d tid (FVal <$> vl) ∗
-        (heap.heap_mapsto_vec l vl ={⊤}=∗
-          ∃z, ⌜st x z⌝ ∗ G ∗ ty_own ty' z d d tid [v]).
+    ty_own ty x d d tid [v] -∗ £(d+1) ={⊤ ∖ ↑advN}=∗
+      ∃(l: cloc) (vl_concrete: list val) (vl: list fancy_val) H, ⌜v = FVal #(l.1)⌝ ∗
+        ⌜length vl_concrete = length vl⌝ ∗
+        H ∗ (H &&{↑NllftG; d+1}&&> (l.1 ↦[^ l.2]∗ vl_concrete)) ∗
+        (∀ l₁ c₁ , (l₁, c₁) #↦∗_ ∗ (l₁, c₁) #↦∗ vl_concrete ={∅}=∗ (l₁, c₁) #↦∗_ ∗ (l₁, c₁) #↦!∗ vl) ∗
+        ⌜StackOkay tyb → vl = fmap FVal vl_concrete⌝ ∗
+        ▷ ty_own tyb (gt x) d d tid vl ∗ (H ={⊤ ∖ ↑advN}=∗
+          ∃ z, ⌜st x z⌝ ∗ G ∗ ty_own ty' z d d tid [v]).
   Global Arguments typed_read {_ _ _} _ _ _%T _%T _%T _ _%type.
 
   Definition typed_instr_ty {𝔄l 𝔅} (E: elctx) (L: llctx) (I: invctx)
@@ -298,44 +291,338 @@ Section typing.
     destruct Extr as [Htrx _]=>?? /=. apply Htrx. by case.
   Qed.
   
-  (** [type_assign_instr] / [type_deref_instr] / [type_memcpy_instr]:
-      not yet ported.
+  (** [type_deref_instr]: typed reading via a [typed_read] proof.
+      Constructs the [G &&{↑NllftG}&&> llctx_interp L] guard, invokes
+      [typed_read] to obtain an abstract [Q] + leaf-guard to the
+      cell-level mapsto, then runs [wp_read_guarded] (which opens
+      the guard, performs the atomic read, and closes).
+      The [StackOkay tyb] side-condition guarantees that the typed
+      cell contents are all-[FVal] (no [FCell]), letting us read a
+      concrete value. *)
+  Lemma type_deref_instr {𝔄 𝔅 𝔄'} (ty: type 𝔄) (tyb: type 𝔅) (ty': type 𝔄')
+        gt st p E L I :
+    StackOkay tyb →
+    tyb.(ty_size) = 1%nat → typed_read E L ty tyb ty' gt st →
+    typed_instr E L I +[p ◁ ty] (!p) (λ v, +[v ◁ tyb; p ◁ ty'])
+      (λ post '-[a], λ mask, ∀ z, st a z → post -[gt a; z] mask).
+  Proof.
+    iIntros (StackOk Sz Rd tid post mask iκs [vπ []]) "#LFT #TIME #E HL $ [p _] %Obs".
+    wp_bind p. iApply (wp_hasty with "p"). iIntros (v d Hev) "#⧖ Hty".
+    iApply pgl_wp_fupd.  (* wrap WP-post in [|={⊤}=>] before mask shrinks *)
+    iApply (wp_persistent_time_receipt d with "TIME ⧖"); [done|solve_ndisj|].
+    iIntros "H£ #⧖S".
+    (* Split [£(advance_credits d)] into [£(d+1)] for Rd and [£(d+1)] for
+       the wp_read_guarded later-credit budget.  Sufficient because
+       [advance_credits d = 10d² + 10d + 10 ≥ 2(d+1)]. *)
+    iDestruct (lc_weaken ((d+1) + (d+1)) with "H£") as "H£big".
+    { rewrite /advance_credits. nia. }
+    iDestruct (lc_split with "H£big") as "[H£Rd H£read]".
+    iApply fupd_pgl_wp.
+    iMod (llctx_interp_make_guarded L (⊤ ∖ ↑advN) with "HL")
+      as (γ) "(Hh1 & Hh2 & #Hguard & #Hback)"; [solve_ndisj|].
+    iMod (Rd vπ d (FVal v) tid (fractional.half γ) _
+            with "LFT E Hguard Hh1 Hty H£Rd")
+      as (l vl_concrete vl Q Heqv Heql) "(HQ & #QPt & _Retether & %Conc & Own & Toty')".
+    inversion Heqv. subst v.
+    have HConc := Conc StackOk. subst vl.
+    iDestruct "Own" as "[Hgho >%Hphys]".
+    (* length vl_concrete = ty_size tyb = 1 *)
+    assert (length vl_concrete = 1%nat) as Sz1.
+    { erewrite <- length_fmap. rewrite <- Hphys. by rewrite ty_size_eq. }
+    destruct vl_concrete as [|v_read [|? ?]]; simpl in Sz1; try lia; [].
+    destruct l as [l_loc l_trace]; simpl in *.
+    iModIntro.
+    (* Apply [wp_read_guarded_singleton] — case-splits l_trace internally
+       and derives False for non-singleton traces. *)
+    iApply (wp_read_guarded_singleton _ l_loc l_trace v_read Q (d+1)
+              with "[$QPt $HQ $H£read]"); [solve_ndisj|].
+    iIntros "!> HQ".
+    iMod (fupd_mask_subseteq (⊤ ∖ ↑advN)) as "Hadv"; first solve_ndisj.
+    iMod ("Toty'" with "HQ") as (z) "(%Hstz & Hh1 & Hty')".
+    iMod "Hadv" as "_".
+    iMod (fupd_mask_subseteq (↑NllftG)) as "Hcl"; first solve_ndisj.
+    iMod ("Hback" with "Hh1 Hh2") as "L".
+    iMod "Hcl" as "_".
+    iModIntro. iExists -[gt vπ; z]. iFrame "L".
+    iSplit; last by iPureIntro; apply Obs.
+    simpl.
+    iSplitL "Hgho".
+    { (* v_read ◁ tyb *)
+      rewrite /tctx_elt_interp /=.
+      iExists v_read, d.
+      iSplit; first by iPureIntro; apply eval_path_of_val.
+      iFrame "⧖". rewrite /ty_own /=. iFrame "Hgho".
+      iPureIntro. by rewrite -Hphys. }
+    iSplitL "Hty'"; last done.
+    rewrite /tctx_elt_interp /=.
+    iExists (LitV (LitLoc l_loc)), d.
+    iSplit; first done.
+    iFrame "⧖". iFrame "Hty'".
+  Qed.
 
-      The infrastructure is now in place to do this:
-      - [typed_write] / [typed_read] above are simplified to use
-        [heap_mapsto_vec] (loc-level) directly, dropping the
-        leaf-guard `H &&{N;d+1}&&> l #↦∗_` (which only existed to
-        handle the [WriteNa1S]/[WriteNa2S] two-step protocol's
-        observable intermediate states; concurrency stripped in
-        Scope B makes the guard unnecessary).
-      - [wp_persistent_time_receipt_lc] in [lang/lifting.v]
-        provides the [⧖n → ⧖(S n) ∗ £(advance_credits n)] step
-        used by the heap-rule proofs.
-      - [wp_write] / [wp_read] in [lang/lifting.v] are usable
-        directly (no [wp_write_na_guarded] wrapper needed).
+  Lemma type_assign_instr {𝔄 𝔅 𝔄' 𝔅'} (ty: type 𝔄) (tyb: type 𝔅)
+        (ty': type 𝔄') (tyb': type 𝔅') gt st p pb E L I :
+    StackOkay tyb → StackOkay tyb' →
+    tyb.(ty_size) = 1%nat →
+    typed_write E L ty tyb ty' tyb' gt st →
+    typed_instr E L I +[p ◁ ty; pb ◁ tyb'] (p <- pb) (λ _, +[p ◁ ty'])
+      (λ post '-[a; b], λ mask, ∀ z, st a b z → post -[z] mask).
+  Proof.
+    iIntros (StackOkB StackOkB' Sz [Eq Wrt] tid post mask iκs [x [y []]]).
+    iIntros "#LFT #TIME #E HL Hinv [p [pb _]] %Obs".
+    iMod (llctx_interp_make_guarded L ⊤ with "HL")
+      as (γ) "(Hh1 & Hh2 & #Hguard & #Hback)"; [solve_ndisj|].
+    wp_bind p. iApply (wp_hasty with "p"). iIntros (v dp Hev_p) "#⧖dp Hty".
+    iApply fupd_pgl_wp.
+    iMod (Wrt x dp (FVal v) tid (fractional.half γ) _
+            with "LFT E Hguard Hh1 Hty")
+      as (l d' H Hveq Hd) "(↦bundle & HH & #HHguard & Hclose)".
+    inversion Hveq. subst v.
+    iDestruct "↦bundle" as "(%vl & >Hmap & Hown)".
+    iDestruct "Hown" as "[Hgho_w >%Hphys_w]".
+    destruct l as [l_loc l_trace]; simpl in *.
+    (* length vl = 1 *)
+    assert (length vl = 1%nat) as Sz1.
+    { rewrite -Hphys_w ty_size_eq. exact Sz. }
+    destruct vl as [|fv_w [|? ?]]; simpl in Sz1; try lia; [].
+    pose proof (StackOkB (gt x) tid) as HOk.
+    rewrite Hphys_w in HOk. simpl in HOk. destruct HOk as [HOk _].
+    destruct fv_w as [v_w|c_w]; last by inversion HOk.
+    iModIntro.
+    wp_bind pb. iApply (wp_hasty with "pb"). iIntros (vb db Hev_b) "#⧖db Htyb'".
+    iDestruct "Htyb'" as "[Hgho_b' Hphys_b']".
+    iApply pgl_wp_fupd.
+    (* Combine ⧖dp and ⧖db into ⧖(dp `max` db) so wp_persistent_time_receipt
+       mints £(advance_credits (dp `max` db)) — enough for both [dp+1] and
+       [db+1] obligations. *)
+    iAssert (⧖(dp `max` db))%I as "#⧖max".
+    { rewrite persistent_time_receipt_sep. iFrame "#". }
+    iApply (wp_persistent_time_receipt (dp `max` db) with "TIME ⧖max");
+      [done|solve_ndisj|].
+    iIntros "H£ #⧖Smax".
+    (* Split credits: [1] strip ▷ on Hphys_b', [3*(dp+1)+1] for wp_write,
+       [2*db*db + 4*db + 2] for closer. *)
+    iDestruct (lc_weaken (1 + ((3*(dp+1)+1) + (2*db*db + 4*db + 2))) with "H£")
+      as "H£big".
+    { rewrite /advance_credits. nia. }
+    iDestruct (lc_split with "H£big") as "[H£one H£rest]".
+    iDestruct (lc_split with "H£rest") as "[H£write H£closer]".
+    iApply fupd_pgl_wp.
+    iMod (lc_fupd_elim_later with "H£one Hphys_b'") as "%Hphys_b'".
+    (* Bump [⧖Smax] down to [⧖(S db)] for Hclose's input. *)
+    iAssert (⧖(S db))%I as "#⧖Sdb".
+    { iApply (persistent_time_receipt_mono with "⧖Smax"). lia. }
+    iModIntro.
+    iApply (wp_write_guarded_singleton _ l_loc l_trace vb v_w
+              H dp
+              with "[$HHguard $HH Hmap $H£write]"); [solve_ndisj|..].
+    { destruct l_trace as [|c0 [|c1 c2]]; rewrite /=.
+      - rewrite /heap.heap_complete_mapsto_fancy_vec /=. by iDestruct "Hmap" as %[].
+      - rewrite /heap.heap_complete_mapsto_fancy_vec /=.
+        iDestruct "Hmap" as "[$ _]".
+      - rewrite /heap.heap_complete_mapsto_fancy_vec /=.
+        by iDestruct "Hmap" as "[_ []]". }
+    iNext. iIntros "[Hmap' HH]".
+    iMod ("Hclose" $! y db with "[Hmap' Hgho_b'] ⧖Sdb H£closer HH")
+      as (z) "(Hh1 & %Hstz & Hty')".
+    { iExists [heap.FVal vb]. iFrame "Hmap'".
+      iNext. rewrite /ty_own /=. iSplit.
+      { iDestruct (tyb'.(ty_gho_depth_mono) db db db (S db) y tid with "Hgho_b'")
+          as "[$ _]"; [lia|lia]. }
+      iPureIntro. rewrite Hphys_b'. reflexivity. }
+    iMod (fupd_mask_subseteq (↑NllftG)) as "Hcl"; first solve_ndisj.
+    iMod ("Hback" with "Hh1 Hh2") as "L".
+    iMod "Hcl" as "_".
+    iModIntro. iExists -[z]. iFrame "L Hinv".
+    iSplit; last by (iPureIntro; apply Obs).
+    simpl. iSplit; last done.
+    rewrite /tctx_elt_interp /=.
+    iExists (LitV (LitLoc l_loc)), (dp `max` S db).
+    iSplit; first done.
+    iCombine "⧖dp ⧖Sdb" as "#⧖final".
+    iFrame "⧖final".
+    iDestruct "Hty'" as "[Hgho_t' %Hphys_t']".
+    iSplit; last done.
+    iDestruct (ty'.(ty_gho_depth_mono) (S db) (dp `max` S db)
+                 (dp `max` S db) (dp `max` S db) z tid with "Hgho_t'")
+      as "[$ _]"; [lia|lia].
+  Qed.
 
-      What still needs design choices to land cleanly:
+  (** [type_memcpy_instr]: typed memcpy via [typed_write] for the
+      destination and [typed_read] for the source.  Mirrors upstream
+      verisbelt's [type_memcpy_instr] verbatim minus prophecy strands. *)
+  Lemma type_memcpy_instr {𝔄 𝔄' 𝔅 𝔅' ℭ ℭ'} (tyw: type 𝔄) (tyw': type 𝔄')
+        (tyr: type 𝔅) (tyr': type 𝔅') (tyb: type ℭ) (tyb': type ℭ')
+        gtw stw gtr str (n: Z) pw pr E L I :
+    typed_write E L tyw tyb tyw' tyb' gtw stw →
+    typed_read E L tyr tyb' tyr' gtr str → n = tyb'.(ty_size) →
+    typed_instr E L I +[pw ◁ tyw; pr ◁ tyr] (pw <-{n} !pr)
+      (λ _, +[pw ◁ tyw'; pr ◁ tyr'])
+      (λ post '-[a; b], λ mask,
+        ∀ zw zr, stw a (gtr b) zw → str b zr → post -[zw; zr] mask).
+  Proof.
+    iIntros ([Eq Wrt] Rd Hn tid post mask iκs [x [y []]]).
+    iIntros "#LFT #TIME #E HL Hinv [pw [pr _]] %Obs".
+    iMod (llctx_interp_make_guarded L ⊤ with "HL")
+      as (γ) "(H1 & H2 & #Ghalf & #Halfback)"; [solve_ndisj|].
+    iMod (fractional.frac_split_guard_in_half _ _ _ ⊤ with "H2 Ghalf")
+      as (γ2) "(H2 & H3 & #Ghalf2 & #Halfback2)"; [solve_ndisj|].
+    wp_bind pw. iApply (wp_hasty with "pw").
+    iIntros (vw dw Hev_w) "#⧖dw tyw".
+    iApply fupd_pgl_wp.
+    iMod (Wrt x dw (FVal vw) tid (fractional.half γ) _
+            with "LFT E Ghalf H1 tyw")
+      as (l d' Hw Hveq Hd) "(↦bundle & Hw & #Hwpt & Totyw)".
+    inversion Hveq. subst vw.
+    iDestruct "↦bundle" as "(%vl & >↦ & Own)".
+    iDestruct "Own" as "[tyb_gho >%tyb_phys]".
+    iModIntro.
+    wp_bind pr. iApply (wp_hasty with "pr").
+    iIntros (vr dr Hev_r) "#⧖dr tyr".
+    iApply pgl_wp_fupd.
+    iAssert (⧖(dw `max` dr))%I as "#⧖max".
+    { rewrite persistent_time_receipt_sep. iFrame "#". }
+    iApply (wp_persistent_time_receipt (dw `max` dr) with "TIME ⧖max");
+      [done|solve_ndisj|].
+    iIntros "H£ #⧖Smax".
+    set (d := S (dw `max` dr)).
+    (* Split credits:
+         £(dr+1)                : Rd's [£(d+1)] input
+         £(6*d + 1)             : wp_memcpy_guarded (depth d, n-agnostic)
+         £(dw+1)                : open Hw's guard later
+         £(2*dr*dr+4*dr+2)      : Wrt's closer *)
+    iDestruct (lc_weaken ((dr+1) + ((6*d + 1)
+                                    + ((dw+1) + (2*dr*dr + 4*dr + 2))))
+                with "H£") as "H£big".
+    { subst d. rewrite /advance_credits. nia. }
+    iDestruct (lc_split with "H£big") as "[£1 H£rest]".
+    iDestruct (lc_split with "H£rest") as "[£6 H£rest2]".
+    iDestruct (lc_split with "H£rest2") as "[£open £3]".
+    iApply fupd_pgl_wp.
+    iMod (Rd y dr (FVal vr) tid (fractional.half γ2) _
+            with "LFT E Ghalf2 H2 tyr £1")
+      as (l0 vlb_concrete vlb Hr Heqv2 Hleneq)
+         "(Hr & #Hrpt' & Retether & _ & Own' & Totyr')".
+    inversion Heqv2. subst vr.
+    iDestruct "Own'" as "[tybP_gho >%HtypP_phys]".
+    assert (length vl = ty_size tyb) as Sz.
+    { rewrite -tyb_phys. apply ty_size_eq. }
+    assert (length vlb_concrete = ty_size tyb') as Sz'.
+    { rewrite Hleneq -HtypP_phys. apply ty_size_eq. }
+    (* Untether dst fancy → concrete for wp_memcpy_guarded. *)
+    iMod (mapsto_vec_untether _ _ _ ∅ with "↦")
+      as (vl_concrete) "(↦ & %Hvlen & RetetherW)".
+    iModIntro.
+    (* Weaken both guards' later counts up to [d = S (dw `max` dr)]. *)
+    iAssert (Hw &&{↑NllftG; d}&&> l #↦∗_)%I as "#Hwpt_w".
+    { iApply (lguards_weaken_later with "Hwpt"). subst d. rewrite Hd. lia. }
+    iAssert (Hr &&{↑NllftG; d}&&> l0.1 ↦[^ l0.2]∗ vlb_concrete)%I
+      as "#Hrpt_w".
+    { iApply (lguards_weaken_later with "Hrpt'"). subst d. lia. }
+    iAssert (⧖d)%I as "#⧖d".
+    { iApply (persistent_time_receipt_mono with "⧖Smax"). subst d. lia. }
+    iApply (wp_memcpy_guarded _ l l0 vl_concrete vlb_concrete Hw Hr n d
+              with "TIME [$↦ $Hwpt_w $Hrpt_w $Hw $Hr $⧖d $£6]").
+    { solve_ndisj. }
+    { rewrite Hvlen Sz Eq. lia. }
+    { simpl. lia. }
+    iNext. iIntros "(↦ & Hw & Hr)".
+    (* Open Hw's guard to get the dst layout (l #↦∗_). *)
+    rewrite Hd.
+    iMod (guards_open_later _ _ ⊤ (↑NllftG) (S d' + 1) with "Hwpt Hw")
+      as "Hop_w"; first solve_ndisj.
+    iMod (lc_fupd_elim_laterN with "£open Hop_w") as ">[prefix back]".
+    (* Apply Rd's polymorphic retether at dst's location with the
+       post-memcpy content vlb_concrete: layout + concrete → layout + fancy_vlb. *)
+    iMod (fupd_mask_subseteq ∅) as "Hmsk"; first solve_ndisj.
+    iMod ("Retether" $! l.1 l.2 with "[$prefix $↦]") as "[prefix ↦_fancy]".
+    iMod "Hmsk" as "_".
+    rewrite -surjective_pairing.
+    iMod ("back" with "prefix") as "Hw".
+    (* We now have ↦_fancy : l #↦!∗ vlb (the new fancy at dst) and Hw. *)
+    iAssert (⧖(S dr))%I as "#⧖Sdr".
+    { iApply (persistent_time_receipt_mono with "⧖Smax"). lia. }
+    iMod (fupd_mask_subseteq ⊤) as "Htop"; first set_solver.
+    iMod ("Totyw" $! (gtr y) dr with "[↦_fancy tybP_gho] ⧖Sdr £3 Hw")
+      as (z) "(H1 & %Hstw & ty')".
+    { iExists vlb. iFrame "↦_fancy".
+      iNext. rewrite /ty_own /=. iSplit.
+      { iDestruct (tyb'.(ty_gho_depth_mono) dr dr dr (S dr) (gtr y) tid
+                    with "tybP_gho") as "[$ _]"; [lia|lia]. }
+      iPureIntro. exact HtypP_phys. }
+    iMod "Htop" as "_".
+    (* Apply Rd's closer. *)
+    iMod (fupd_mask_subseteq (⊤ ∖ ↑advN)) as "Hadv"; first solve_ndisj.
+    iDestruct ("Totyr'" with "Hr") as "Totyr'".
+    iMod "Totyr'" as (zr) "(%Hstr & H3back & tyr')".
+    iMod "Hadv" as "_".
+    (* Recompose llctx via the two halfbacks. *)
+    iMod (fupd_mask_subseteq (↑NllftG)) as "Hcl"; first solve_ndisj.
+    iMod ("Halfback2" with "H3 H3back") as "H2_γ".
+    iMod ("Halfback" with "H1 H2_γ") as "L".
+    iMod "Hcl" as "_".
+    iModIntro. iExists -[z; zr]. iFrame "L Hinv".
+    iSplit; last by (iPureIntro; apply Obs).
+    simpl.
+    set (finalw := S (d' `max` dr)).
+    iAssert (⧖finalw)%I as "#⧖finalw".
+    { iApply (persistent_time_receipt_mono with "⧖Smax"). subst finalw. lia. }
+    iSplitL "ty'".
+    { (* pw ◁ tyw' at depth finalw = S (d' `max` dr) *)
+      rewrite /tctx_elt_interp /=.
+      iExists (LitV (LitLoc l.1)), finalw.
+      iSplit; first done.
+      iFrame "⧖finalw".
+      iDestruct "ty'" as "[gho %phys]".
+      iSplit; last done.
+      iDestruct (tyw'.(ty_gho_depth_mono) (S dr) finalw finalw finalw z tid
+                  with "gho") as "[$ _]"; subst finalw; [lia|lia]. }
+    iSplit; last done.
+    (* pr ◁ tyr' — bump depth to [finalw] matching upstream. *)
+    rewrite /tctx_elt_interp /=.
+    iExists (LitV (LitLoc l0.1)), finalw.
+    iSplit; first done.
+    iFrame "⧖finalw".
+    iDestruct "tyr'" as "[gho %phys]".
+    iSplit; last done.
+    iDestruct (tyr'.(ty_gho_depth_mono) dr dr finalw finalw zr tid
+                with "gho") as "[$ _]"; subst finalw; [lia|lia].
+  Qed.
 
-      1. **[⧗] threading.** [wp_persistent_time_receipt_lc] consumes
-         one [⧗1] per use.  The rule needs to acquire that [⧗1]
-         from somewhere — either threaded through [typed_body] /
-         [typed_instr] (typing-layer-wide change), or carried as a
-         tctx entry, or supplied as an explicit iProp premise to
-         each heap-rule lemma (clients pre-allocate a [⧗]-pool at
-         adequacy time).
-      2. **Mapsto-fancy bridging.** [typed_write] now hands back
-         [heap_mapsto_vec l vl] and [▷ ty_own tyb _ _ _ (FVal <$> vl)],
-         while the [tyb'] from [wp_hasty pb] uses
-         [ty_own tyb' y db' db' tid [FVal vb]] (singleton).  The
-         proof needs [length vl = 1] (from the size constraint)
-         and to convert `[vb]` into a list-valued shape matching
-         the closer.  Mechanical, but a few rewrites.
+  Lemma type_assign {𝔄 𝔅 𝔄' 𝔅' 𝔄l 𝔅l ℭ} (ty: type 𝔄) (tyb: type 𝔅)
+        (ty': type 𝔄') (tyb': type 𝔅') gt st p pb E L
+        (I: invctx) (C: cctx ℭ) (T: tctx 𝔄l) (T': tctx 𝔅l) trx tr e :
+    Closed [] e →
+    tctx_extract_ctx E L +[p ◁ ty; pb ◁ tyb'] T T' trx →
+    StackOkay tyb → StackOkay tyb' →
+    tyb.(ty_size) = 1%nat →
+    typed_write E L ty tyb ty' tyb' gt st →
+    typed_body E L I C (p ◁ ty' +:: T') e tr -∗
+    typed_body E L I C T (p <- pb;; e)
+      (trx ∘ (λ post '(a -:: b -:: bl) mask, ∀ z, st a b z → tr post (z -:: bl) mask))%type.
+  Proof.
+    iIntros (Hcle Extr SOk SOk' Sz Wrt) "?".
+    iApply type_seq;
+      [eapply type_assign_instr; [exact SOk|exact SOk'|exact Sz|exact Wrt]
+      |done| |done].
+    destruct Extr as [Htrx _]=>?? /=. apply Htrx. by case=> [?[??]].
+  Qed.
 
-      Once those two are settled, the proof body is a
-      straightforward port of the original (already present in
-      verusbelt's pre-strip [programs.v]) with [wp_write] in place
-      of [wp_write_na_guarded] and [wp_persistent_time_receipt_lc]
-      in place of [wp_persistent_time_receipt]. *)
+  Lemma type_deref {𝔄 𝔅 𝔄' 𝔄l 𝔅l ℭ} (ty: type 𝔄) (tyb: type 𝔅) (ty': type 𝔄')
+        gt st (T: tctx 𝔄l) (T': tctx 𝔅l) p x e trx tr E L
+        (I: invctx) (C: cctx ℭ) :
+    Closed (x :b: []) e → tctx_extract_ctx E L +[p ◁ ty] T T' trx →
+    StackOkay tyb →
+    typed_read E L ty tyb ty' gt st → tyb.(ty_size) = 1%nat →
+    (∀v: val, typed_body E L I C (v ◁ tyb +:: p ◁ ty' +:: T') (subst' x v e) tr) -∗
+    typed_body E L I C T (let: x := !p in e)
+      (trx ∘ (λ post '(a -:: al) mask, ∀ z, st a z → tr post (gt a -:: z -:: al) mask))%type.
+  Proof.
+    iIntros (? Extr SOk Rd Sz) "?". iApply type_let; [by eapply type_deref_instr|done| |done].
+    destruct Extr as [Htrx _]=>?? /=. apply Htrx. by case.
+  Qed.
+
+  (** [type_memcpy] convenience wrapper — pending [type_memcpy_instr] port. *)
 End typing.
 
 Ltac via_tr_impl :=

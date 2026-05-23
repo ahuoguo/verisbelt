@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From lrust.lang Require Import notation.
-From lrust.typing Require Import type lft_contexts type_context inv_context proph_stubs.
+From lrust.typing Require Import type lft_contexts type_context inv_context.
 From lrust.lifetime Require Import lifetime_full.
 Set Default Proof Using "Type".
 

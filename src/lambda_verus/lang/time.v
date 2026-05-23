@@ -404,22 +404,38 @@ Lemma time_init `{!invGS Σ, !timePreG Σ} E : ↑timeN ⊆ E →
   £(advance_credits 4) ⊢ |={E}=> ∃ _ : timeGS Σ, time_ctx ∗ time_interp 1.
 Proof.
   intros ?. iIntros "Hc".
-  iMod (own_alloc (●MN 2 ⋅ mono_nat_lb 2)) as (time_global_name) "[A B]";
+  iMod (own_alloc (●MN 2 ⋅ mono_nat_lb 2)) as (γglob) "[A B]";
     [by apply mono_nat_both_valid|].
-  iMod (own_alloc (●MN 0)) as (time_persistent_name) "p";
+  iMod (own_alloc (●MN 0)) as (γpers) "p";
     [by apply mono_nat_auth_valid|].
-  iMod (own_alloc (● 2%nat ⋅ ◯ 2%nat)) as (time_cumulative_name) "[c ⧗]"; [by apply auth_both_valid|].
-  iMod (own_alloc (to_frac_agree (A:=leibnizO bool) (1 / 2) true ⋅ to_frac_agree (A:=leibnizO bool) (1 / 2) true)) as (time_bool_name) "[Ho Ho2]".
-      { rewrite frac_agree_op_valid. rewrite Qp.half_half. split; trivial. }
-  iMod (own_alloc (to_frac_agree (A:=leibnizO nat) (1 / 2) 2%nat ⋅ to_frac_agree (A:=leibnizO nat) (1 / 2) 2%nat)) as (time_cur_sum_name) "[Hx Hx2]".
-      { rewrite frac_agree_op_valid. rewrite Qp.half_half. split; trivial. }
-  iExists (TimeG _ _ _ _ _ time_global_name time_persistent_name time_cumulative_name time_bool_name time_cur_sum_name).
-  iSplitR "A Ho"; last first.
-  - iModIntro. iLeft. eauto with iFrame lia.
-  - iMod (inv_alloc with "[Ho2 Hx2 ⧗]") as "I1"; last first.
-    + iMod (inv_alloc with "[Hc Hx B p c]") as "I2"; last first.
-      * iModIntro. iSplit; [iFrame "I2" | iFrame "I1"].
-      * iFrame.
-        iApply (lc_weaken with "Hc"). rewrite /advance_credits. nia.
-    + iFrame. iNext. iExists 0%nat. by iFrame.
+  iMod (own_alloc (● 2%nat ⋅ ◯ 2%nat)) as (γcum) "[c ⧗]";
+    [by apply auth_both_valid|].
+  iMod (own_alloc (to_frac_agree (A:=leibnizO bool) (1 / 2) true ⋅
+                   to_frac_agree (A:=leibnizO bool) (1 / 2) true))
+       as (γbool) "[Ho Ho2]".
+  { rewrite frac_agree_op_valid Qp.half_half. split; trivial. }
+  iMod (own_alloc (to_frac_agree (A:=leibnizO nat) (1 / 2) 2%nat ⋅
+                   to_frac_agree (A:=leibnizO nat) (1 / 2) 2%nat))
+       as (γsum) "[Hx Hx2]".
+  { rewrite frac_agree_op_valid Qp.half_half. split; trivial. }
+  pose (HtimeGS := TimeG Σ _ _ _ _ γglob γpers γcum γbool γsum).
+  iExists HtimeGS.
+  iAssert (▷ (∃ n, enable γbool true ∗
+                   cur_sum γsum (n + 2 + n)%nat ∗
+                   own γcum (◯ (n + 2)%nat)))%I
+    with "[Ho2 Hx2 ⧗]" as "Padv".
+  { iNext. iExists 0%nat. simpl. by iFrame. }
+  iMod (inv_alloc advN E _ with "Padv") as "#I_adv".
+  iAssert (▷ (∃ n m, own γglob (mono_nat_lb (n + m)) ∗
+                     own γcum (● n) ∗
+                     own γpers (●MN m) ∗
+                     £ (n * advance_credits (n + m)) ∗
+                     cur_sum γsum (n + m)%nat))%I
+    with "[Hc Hx B p c]" as "Ptime".
+  { iNext. iExists 2%nat, 0%nat. iFrame.
+    iApply (lc_weaken with "Hc"). rewrite /advance_credits. nia. }
+  iMod (inv_alloc timeN E _ with "Ptime") as "#I_time".
+  iModIntro. iSplitR "A Ho".
+  - rewrite /time_ctx. by iFrame "I_time I_adv".
+  - iLeft. iFrame. iPureIntro. lia.
 Qed.

@@ -48,7 +48,7 @@ From lrust.util Require Import cancellable_na_invariants cancellable
 From guarding.lib Require Import fractional cancellable.
 From lrust.lifetime Require Import lifetime_full.
 From lrust.lang Require Import adequacy proofmode notation lang heap lifting time.
-From lrust.typing Require Import type programs.
+From lrust.typing Require Import type programs rand_ubig.
 Import uPred.
 Set Default Proof Using "Type".
 
@@ -77,67 +77,40 @@ Theorem type_soundness `{!typePreG Σ}
 Proof.
   intros Hσ Htr Hbody.
   apply (pure_soundness (PROP:=iPropI Σ)).
-  apply (laterN_soundness _ (S (advance_credits 4 + 1 + n))).
+  apply (laterN_soundness _ (S (lrust_total_step_credits 1 n))).
   rewrite laterN_later -except_0_into_later.
-  iMod (hfupd_soundness HasLc (advance_credits 4 + 1) ⊤) as (Hinv) "(H£ & Hhfupd)".
-  iApply "Hhfupd".
+  apply (fupd_finally_soundness HasLc
+           (1 + advance_credits 4 + lrust_total_step_credits 1 n) ⊤).
+  iIntros (Hinv) "Hlc_total".
+  iDestruct (lc_split 1
+               (advance_credits 4 + lrust_total_step_credits 1 n)%nat
+               with "Hlc_total") as "[H£llft Hrest]".
+  iDestruct (lc_split (advance_credits 4)
+               (lrust_total_step_credits 1 n)
+               with "Hrest") as "[H£time Hlc]".
   iMod (ec_alloc nnreal_zero) as (Hec) "[Hs _]"; [simpl; lra|].
   iMod (non_atomic_cell_map.non_atomic_map_alloc_heap σ Hσ) as (vγ) "Hvγ".
   iMod (own_alloc (● (∅ : heap.heap_freeableUR))) as (fγ) "Hfγ";
     [by apply auth_auth_valid|].
   iMod na_invariants_fork.na_alloc as (threadpool_γ) "Hpool".
   iMod atomic_lock_counter.atomic_lock_ctr_alloc as (alc_γ) "Hctr".
-  (* Allocate time ghost state, keeping ALL fragments so we can
-     install [time_ctx] for the SAME [timeGS] as state_interp uses. *)
-  iMod (own_alloc ((●MN 2) ⋅ (mono_nat_lb 2))) as (γglob) "[Hglob Hglobf]";
-    [by apply mono_nat_both_valid|].
-  iMod (own_alloc (●MN 0)) as (γpers) "Hpers";
-    [by apply mono_nat_auth_valid|].
-  iMod (own_alloc ((● 2%nat) ⋅ (◯ 2%nat))) as (γcum) "[HcumA HcumF]";
-    [by apply auth_both_valid|].
-  iMod (own_alloc (to_frac_agree (A:=leibnizO bool) (1 / 2) true ⋅
-                   to_frac_agree (A:=leibnizO bool) (1 / 2) true)) as (γbool) "[Hbool HboolB]".
-  { rewrite frac_agree_op_valid. rewrite Qp.half_half. split; trivial. }
-  iMod (own_alloc (to_frac_agree (A:=leibnizO nat) (1 / 2) 2%nat ⋅
-                   to_frac_agree (A:=leibnizO nat) (1 / 2) 2%nat)) as (γsum) "[HsumA HsumB]".
-  { rewrite frac_agree_op_valid. rewrite Qp.half_half. split; trivial. }
-  pose (Htime := TimeG Σ _ _ _ _ γglob γpers γcum γbool γsum).
+  iMod (time_init ⊤ with "H£time") as (Htime) "[#TIME Hti]"; [solve_ndisj|].
   pose (Hheap := heap.HeapGS _ _ _ _ vγ fγ threadpool_γ alc_γ).
   pose (HlrustGS := LRustGS Σ Hinv _ _ Hheap Hec Htime).
-  (* Split credits: most for [time_ctx] storage, [£1] for [llft_alloc]. *)
-  rewrite lc_split. iDestruct "H£" as "[H£time H£lft]".
-  iAssert (£(2 * advance_credits 2))%I with "[H£time]" as "H£timeStorage".
-  { iApply (lc_weaken with "H£time"). unfold advance_credits. lia. }
-  (* Bridge to pgl via [wp_refRcoupl_hfupd]; the time-ctx, llft, and
-     invctx invariants get allocated *inside* the WP, where [fupd_pgl_wp]
-     lets us discharge [fupd] modalities (unlike the outer hfupd). *)
-  iPoseProof (wp_refRcoupl_hfupd 1 nnreal_zero e σ n (λ _, True)) as "H".
-  iSpecialize ("H" with "[-]"); last first.
-  { iSpecialize ("H" $! (advance_credits 4 + 1)%nat). iApply "H". }
-  rewrite /state_interp /= /heap.heap_ctx.
-  iSplitR "Hs Hglobf HcumA Hpers H£timeStorage HsumA HboolB HsumB HcumF H£lft"; last first.
-  { iFrame "Hs".
+  iPoseProof (@wp_refRcoupl Σ _ 1 nnreal_zero e σ n (λ _, True)) as "H".
+  iSpecialize ("H" with "[-]").
+  { iFrame "Hlc".
+    iSplitR "Hs H£llft".
+    { rewrite /state_interp /=. iSplitR "Hti".
+      - rewrite /heap.heap_ctx. iExists ∅. iFrame "Hvγ Hfγ".
+        iSplit.
+        { iPureIntro. rewrite /heap.heap_freeable_rel. intros blk qs Hbad.
+          by rewrite lookup_empty in Hbad. }
+        rewrite /heap.heap_ato_ctx. iFrame.
+      - iApply "Hti". }
+    iFrame "Hs".
     iApply fupd_pgl_wp.
-    iMod (inv_alloc timeN ⊤ (∃ n' m',
-              own time_global_name (mono_nat_lb (n' + m')) ∗
-              own time_cumulative_name (● n') ∗
-              own time_persistent_name (●MN m') ∗
-              £ (n' * advance_credits (n' + m')) ∗
-              own time_sum_name (to_frac_agree (A:=leibnizO nat) (1/2)%Qp (n' + m')%nat))%I
-            with "[Hglobf HcumA Hpers H£timeStorage HsumA]") as "#TIME_N".
-    { iNext. iExists 2%nat, 0%nat. iFrame "HcumA Hpers HsumA".
-      rewrite Nat.add_0_r. iFrame "Hglobf".
-      iApply (lc_weaken with "H£timeStorage").
-      unfold advance_credits. lia. }
-    iMod (inv_alloc advN ⊤ (∃ n', enable time_enabled_bool_name true ∗
-              own time_sum_name (to_frac_agree (A:=leibnizO nat) (1/2)%Qp (n' + 2 + n')%nat) ∗
-              cumulative_time_receipt (n' + 2)%nat)%I
-            with "[HboolB HsumB HcumF]") as "#TIME_A".
-    { iNext. iExists 0%nat. simpl.
-      iFrame "HboolB HsumB". rewrite /cumulative_time_receipt. iFrame. }
-    iAssert (time_ctx) with "[]" as "#TIME".
-    { iSplit; [iApply "TIME_N" | iApply "TIME_A"]. }
-    iMod (llft_alloc with "H£lft") as (Hlft) "#LFT".
+    iMod (llft_alloc with "H£llft") as (Hlft) "#LFT".
     pose (Hcna := {| cnaInv_na_inv_inG := type_preG_cna_invG |}).
     iMod (@invctx_alloc Σ _ _ _ Hcna ⊤) as (tid) "Hinvctx".
     pose (Htype := @TypeG Σ HlrustGS Hlft _ _ _).
@@ -152,13 +125,7 @@ Proof.
     - iIntros (c Hin). by inversion Hin.
     - simpl; done.
     - iPureIntro. exact Htr. }
-  iSplitL "Hvγ Hfγ Hpool Hctr".
-  { iExists ∅. iFrame "Hvγ Hfγ".
-    iSplit.
-    { iPureIntro. rewrite /heap.heap_freeable_rel. intros blk qs Hbad.
-      by rewrite lookup_empty in Hbad. }
-    rewrite /heap.heap_ato_ctx. iFrame. }
-  iLeft. iFrame "Hbool Hglob". iPureIntro. lia.
+  iApply "H".
 Qed.
 
 Theorem type_soundness_trivial `{!typePreG Σ}
@@ -196,4 +163,103 @@ Proof.
             with "LFT TIME E_ L_ Hinv Htctx []").
     iPureIntro. done.
   - iIntros (v') "_". done.
+Qed.
+
+(* TODO: should we add error credits as a new context *)
+(** [type_soundness_credit]: bridges a [typed_body] derivation under
+    a singleton input tctx [+[c ◁ ↯_T ε]] (a Verus-style
+    [Tracked<ErrorCreditResource>] of magnitude [ε]) to a pgl bound
+    [pgl (exec n (e, σ)) (λ _, True) ε].
+
+    Generalises [type_soundness] to expressions that consume an
+    initial error-credit budget — the typing-layer analogue of
+    Verus's "function takes a tracked credit as input".  The
+    user's [typed_body] is universally quantified over the loc
+    used as the path-witness handle (cf. [rand_ubig.v]).
+
+    The pgl bound is [ε] (not [0]) because the [ec_alloc] inside
+    the proof allocates a [↯ ε] supply that the user's typed_body
+    consumes.  When [ε = 1/2], the conclusion says "probability
+    of stuck states ≤ 1/2".  Predicate-wise this is trivial
+    (predicate is [(λ _, True)]) but the load-bearing content is
+    the WP itself, which entails reducibility at every reachable
+    state.
+
+    Caveat: the chosen loc [l_pick] is *fictional* — it doesn't
+    correspond to any heap allocation, and may alias with an
+    existing heap location (the credit's [ty_own] has no
+    heap-mapsto piece, so there is no semantic conflict). *)
+Theorem type_soundness_credit `{!typePreG Σ}
+    {𝔅 : syn_type}
+    (tr : predl_trans' [at_locₛ (trackedₛ unitₛ)] 𝔅)
+    (post : pred' (~~𝔅))
+    (ε : R)
+    (e : language.expr lrust_prob_lang) (σ : language.state lrust_prob_lang) n :
+  (∀ l ls v, σ !! l = Some (ls, v) → ls = RSt 0%nat) →
+  (0 <= ε < 1)%R →
+  (∀ l : loc, tr post -[(l, ())] ⊤) →
+  (∀ `{!typeG Σ, !cnaInv_logicG Σ} (l : loc),
+      ⊢ typed_body (𝔄l := [at_locₛ (trackedₛ unitₛ)]) (𝔅 := 𝔅) [] []
+                   (InvCtx [] static AtomicClosed) []
+                   +[#l ◁ error_credit_ty ε] e tr) →
+  pgl (exec n (e, σ)) (λ _, True) ε.
+Proof.
+  intros Hσ [Hε_pos Hε_lt1] Htr Hbody.
+  apply (pure_soundness (PROP:=iPropI Σ)).
+  apply (laterN_soundness _ (S (lrust_total_step_credits 1 n))).
+  rewrite laterN_later -except_0_into_later.
+  apply (fupd_finally_soundness HasLc
+           (1 + advance_credits 4 + lrust_total_step_credits 1 n) ⊤).
+  iIntros (Hinv) "Hlc_total".
+  iDestruct (lc_split 1
+               (advance_credits 4 + lrust_total_step_credits 1 n)%nat
+               with "Hlc_total") as "[H£llft Hrest]".
+  iDestruct (lc_split (advance_credits 4)
+               (lrust_total_step_credits 1 n)
+               with "Hrest") as "[H£time Hlc]".
+  iMod (ec_alloc (mknonnegreal ε Hε_pos)) as (Hec) "[Hs Hcr]"; [done|].
+  iMod (non_atomic_cell_map.non_atomic_map_alloc_heap σ Hσ) as (vγ) "Hvγ".
+  iMod (own_alloc (● (∅ : heap.heap_freeableUR))) as (fγ) "Hfγ";
+    [by apply auth_auth_valid|].
+  iMod na_invariants_fork.na_alloc as (threadpool_γ) "Hpool".
+  iMod atomic_lock_counter.atomic_lock_ctr_alloc as (alc_γ) "Hctr".
+  iMod (time_init ⊤ with "H£time") as (Htime) "[#TIME Hti]"; [solve_ndisj|].
+  pose (Hheap := heap.HeapGS _ _ _ _ vγ fγ threadpool_γ alc_γ).
+  pose (HlrustGS := LRustGS Σ Hinv _ _ Hheap Hec Htime).
+  iPoseProof (@wp_refRcoupl Σ _ 1 (mknonnegreal ε Hε_pos) e σ n (λ _, True)) as "H".
+  iSpecialize ("H" with "[-]").
+  { iFrame "Hlc".
+    iSplitR "Hs Hcr H£llft".
+    { rewrite /state_interp /=. iSplitR "Hti".
+      - rewrite /heap.heap_ctx. iExists ∅. iFrame "Hvγ Hfγ".
+        iSplit.
+        { iPureIntro. rewrite /heap.heap_freeable_rel. intros blk qs Hbad.
+          by rewrite lookup_empty in Hbad. }
+        rewrite /heap.heap_ato_ctx. iFrame.
+      - iApply "Hti". }
+    iFrame "Hs".
+    iApply fupd_pgl_wp.
+    iMod (llft_alloc with "H£llft") as (Hlft) "#LFT".
+    pose (Hcna := {| cnaInv_na_inv_inG := type_preG_cna_invG |}).
+    iMod (@invctx_alloc Σ _ _ _ Hcna ⊤) as (tid) "Hinvctx".
+    pose (Htype := @TypeG Σ HlrustGS Hlft _ _ _).
+    iMod persistent_time_receipt_0 as "#⧖0".
+    (* Pick a fictional loc for the credit's path-witness handle. *)
+    pose (l_pick := ((1%positive, 0%Z) : loc)).
+    iPoseProof (Hbody Htype Hcna l_pick) as "Hb".
+    iModIntro.
+    iApply (pgl_wp_mono _ _ _ (λ _, cont_postcondition)).
+    { iIntros (v) "_". iPureIntro. done. }
+    iApply ("Hb" $! tid -[(l_pick, ())] ⊤ post []
+              with "LFT TIME [] [] Hinvctx [] [Hcr] []").
+    - iApply big_sepL_nil. done.
+    - iApply big_sepL_nil. done.
+    - iIntros (c Hin). by inversion Hin.
+    - rewrite /tctx_elt_interp /=.
+      iSplit; last done.
+      iExists (LitV (LitLoc l_pick)), 0%nat.
+      iSplit; first done.
+      iFrame "⧖0". rewrite /ty_own /=. by iFrame "Hcr".
+    - iPureIntro. apply Htr. }
+  iApply "H".
 Qed.

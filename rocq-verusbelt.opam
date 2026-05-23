@@ -11,7 +11,7 @@ depends: [
   "rocq-core" {>= "9.1.1" & < "9.2~"}
   "rocq-stdlib" {>= "9.0.0" & < "9.2~"}
   "rocq-stdpp" {= "1.13.0"}
-  # NOTE: Amin's branch declares a strict stdpp dev constraint in its
+  # NOTE: iris dev declares a strict stdpp dev constraint in its
   # own opam file, but its Rocq source is compatible with stdpp 1.13.0.
   # Install with: [opam install . --ignore-constraints-on=rocq-stdpp]
   "rocq-iris" {= "dev"}
@@ -23,8 +23,6 @@ depends: [
   "coq-mathcomp-analysis" {= "1.14.0"}
 ]
 pin-depends: [
-  [ "rocq-iris.dev"
-    "git+https://gitlab.mpi-sws.org/amintimany/iris-coq.git#improve-later-credits" ]
   [ "rocq-clutch.dev"
     "git+https://github.com/logsem/clutch.git#eris-lc-step" ]
 ]

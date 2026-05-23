@@ -1,8 +1,8 @@
 From lrust.lang.lib Require Import memcpy new_delete.
 From lrust.typing Require Export type.
 From lrust.typing Require Import uninit type_context programs freeable_util tracked.
-From guarding Require Import guard tactics.
 From lrust.lifetime Require Import lifetime_full.
+From guarding Require Import guard.
 Set Default Proof Using "Type".
 
 Implicit Type 𝔄 𝔅: syn_type.
@@ -14,15 +14,15 @@ Section own.
     ty_size := 1;
     ty_lfts := ty.(ty_lfts);
     ty_E := ty.(ty_E);
-    
+
     ty_gho x d g tid := [S(d') := d]
       ((fst x) ↦!∗ ty.(ty_phys) (snd x) tid) ∗
       freeable_sz n ty.(ty_size) (fst x) ∗
       ▷ (ty.(ty_gho) (snd x) d' g tid) ;
-      
+
     ty_gho_pers x d g tid := [S(d') := d]
       ▷ (ty.(ty_gho_pers) (snd x) d' g tid) ;
-    
+
     ty_phys x tid := [FVal (LitV (fst x))];
   |}%I.
   Next Obligation. move=> ?????* //=. Qed.
@@ -43,23 +43,10 @@ Section own.
     iDestruct (ty.(ty_gho_pers_depth_mono) with "H") as "$" => //; first lia.
   Qed.
   Next Obligation.
-    intros 𝔄 n ty κ x n0 d g tid ξ R Hin.
-    iIntros "#CTX #Incl #GhoPers".
-    destruct d as [|d']; first by done.
-    iDestruct (ty_guard_proph _ ty _ _ (n0+1) _ _ _ ξ R Hin with "CTX Incl GhoPers") as "#L".
-    iApply (bi.laterN_le (S (d' * (g + 1)))). { lia. }
-    iNext. iNext. iIntros "#A #B".
-    leaf_goal laters to (n0 + 1 + d' * (g + 1)). { lia. }
-    iApply "L".
-      - leaf_goal laters to n0. { lia. } iFrame "A".
-      - iApply (guards_transitive_additive with "B []"). leaf_by_sep.
-        simpl. iIntros "[C [D E]]". iNext. iFrame. iIntros. iFrame.
-  Qed.
-  Next Obligation.
     intros 𝔄 n ty x d g tid. iIntros "A". destruct d as [|d']; first by done.
     iDestruct "A" as "[_ [_ pers]]". iApply ty_gho_pers_impl. iFrame.
   Qed.
-  
+
   Global Instance own_ne {𝔄} n : NonExpansive (@own_ptr 𝔄 n).
   Proof. solve_ne_type. Qed.
 
@@ -71,24 +58,15 @@ Section own.
       f_contractive. naive_solver.
     - move=>/= > *. do 6 (f_contractive || f_equiv).
   Qed.
-  
+
   Lemma own_stack_okay {𝔄} n (ty: type 𝔄) : StackOkay (own_ptr n ty).
   Proof. done. Qed.
 
   Global Instance own_send {𝔄} n (ty: type 𝔄) : Send ty → Send (own_ptr n ty).
-  Proof. move=> [Hphys Hgho]. split => //=.
-       - intros tid tid' x x' He. inversion He. trivial.
-       - intros tid tid' x d g G H κs d0 Hineq TG TH.
-         iIntros "LFT UNIQ TIME Hg H Gg G Hgho #⧖o".
-         destruct d => //=.
-         iDestruct "Hgho" as "(Hown&Hfree&Hgho)".
-         iFrame "%". iModIntro. iNext. iModIntro.
-         iPoseProof (Hgho with "LFT UNIQ TIME Hg H Gg G Hgho ⧖o") as "X"; first lia.
-         iApply (step_fupdN_wand with "X"). iIntros ">X".
-         iDestruct "X" as (x' off) "[gho [#⧖off [%Habs [G H]]]]".
-         rewrite (Hphys tid tid' (x.2) x'); last by done.
-         iExists (x.1, x'), (off). iModIntro. iFrame. iFrame "#". iPureIntro. simpl.
-         rewrite Habs. trivial.
+  Proof.
+    intros [Hphys]. split.
+    intros tid tid' x x' He. simpl. unfold syn_abstract in He. simpl in He.
+    inversion He. trivial.
   Qed.
 
   Global Instance own_sync {𝔄} n (ty: type 𝔄) : Sync ty → Sync (own_ptr n ty).
@@ -120,33 +98,13 @@ Section own.
     by iExists _.
   Qed.
 
-  Lemma own_resolve {𝔄} E L n (ty: type 𝔄) Φ :
-    resolve E L ty Φ → resolve E L (own_ptr n ty) (λ '(l, v), Φ v).
-  Proof.
-    iIntros (Rslv G F x d g tid ??) "LFT PROPH UNIQ TIME E L own //".
-    iIntros "Hgho".
-    destruct d => //=.
-    iDestruct "Hgho" as "(Hown&Hfree&Hgho)".
-    iModIntro.
-    replace (g + 1 + d * (g + 1)) with (S (g + d * (g + 1))) by lia.
-    simpl. iModIntro. iNext.
-    iDestruct (Rslv G F (snd x) d g tid _ with "[$] [$] [$] [$] [$] [$] [$] Hgho") as "Hrslv".
-      { trivial. }
-    iMod "Hrslv". iModIntro.
-    iDestruct (step_fupdN_nmono with "Hrslv") as "Hrslv"; last first.
-     - iApply (step_fupdN_wand with "Hrslv []").
-       iIntros "F". iMod "F" as "[Obs G]".
-       iModIntro. iFrame "G".
-       iApply (proph_obs_impl with "Obs").
-       intros π Ha. destruct x. apply Ha.
-     - lia.
-  Qed.
+  (* [own_resolve] removed along with [resolve]. *)
 
   Lemma own_type_incl {𝔄 𝔅} n (f: 𝔄 →ₛ 𝔅) ty1 ty2 :
     type_incl ty1 ty2 f -∗ type_incl (own_ptr n ty1) (own_ptr n ty2) (at_loc_mapₛ f).
   Proof.
     iIntros "(%Eq & #Incl & #InOwn & #InOwnPers & %Phys)".
-    do 2 (iSplit; [done|]). 
+    do 2 (iSplit; [done|]).
     iSplit. {
       iModIntro.
       iIntros ([l x0] [ | d] g tid) "Hown //=".
@@ -184,7 +142,7 @@ Section box.
   Context `{!typeG Σ}.
 
   Definition box {𝔄} (ty: type 𝔄) : type (at_locₛ 𝔄) := own_ptr ty.(ty_size) ty.
-  
+
   Definition own_tracked {𝔄} (ty: type 𝔄) : type (at_locₛ (trackedₛ 𝔄)) := own_ptr 0 (tracked_ty ty).
 
   Global Instance box_ne 𝔄 : NonExpansive (@box 𝔄).
@@ -218,14 +176,19 @@ Section box.
   Proof. move=> [??]. split; by apply box_subtype. Qed.
 End box.
 
+(** Heap-effecting typing rules.  All proved against our simplified
+    [typed_write] / [typed_read] (which use [heap_mapsto_vec] rather
+    than upstream's [fancy_val] mapsto + leaf-guard).  [type_new_instr]
+    mints its [⧗1] via [wp_cumulative_time_receipt1]. *)
 Section typing.
-  Context `{!typeG Σ}.
-   Lemma write_own {𝔄 𝔅} (ty: type 𝔄) (ty': type 𝔅) n E L :
+  Context `{!typeG Σ, !cnaInv_logicG Σ}.
+
+  Lemma write_own {𝔄 𝔅} (ty: type 𝔄) (ty': type 𝔅) n E L :
     ty.(ty_size) = ty'.(ty_size) →
     typed_write E L (own_ptr n ty) ty (own_ptr n ty') ty' (λ v, v.2) (λ u b' u', u' = (u.1, b')).
   Proof.
     move=> Sz. split; [done|].
-    iIntros ([l x0] [|d] v tid G ?) "LFT UNIQ E L G [Hgho %Hphys] //=".
+    iIntros ([l x0] [|d] v tid G ?) "LFT E L G [Hgho %Hphys] //=".
     iDestruct "Hgho" as "(Hown&Hfree&Hgho)".
     rewrite /own_ptr /= in Hphys. move: Hphys; case => <-.
     iExists (l, repeat [] (length (ty_phys ty x0 tid))).
@@ -263,14 +226,14 @@ Section typing.
     iFrame "Hown".
     iSplitR.
     { rewrite heap_mapsto_cells_fancy_empty. rewrite <- heap_mapsto_cells_fancy_fmap_eq.
-      rewrite fmap_to_concrete. { iApply guard.guards_refl. } inversion Cpy; trivial. }
+      rewrite fmap_to_concrete. { iApply guards_refl. } inversion Cpy; trivial. }
     rewrite /ty_own.
     iSplitR. {
       iIntros. rewrite <- heap_complete_mapsto_fancy_fmap_eq. rewrite fmap_to_concrete.
         { iFrame. done. } { trivial. }
     }
     iSplit. { inversion Cpy. rewrite fmap_to_concrete; done. }
-    iSplit. { iNext. iSplitL => //. 
+    iSplit. { iNext. iSplitL => //.
       iPoseProof (ty_gho_depth_mono _ d (S d) (S d) (S d) with "Hgho") as "[? _]"; [lia..|done]. }
     iIntros "Hown".
     iModIntro.
@@ -278,7 +241,7 @@ Section typing.
   Qed.
 
   Lemma read_own_move {𝔄} (ty: type 𝔄) n E L :
-    typed_read E L (own_ptr n ty) ty (own_ptr n (↯ ty.(ty_size))) (λ v, v.2) (λ v z, v.1 = z.1).
+    typed_read E L (own_ptr n ty) ty (own_ptr n ((↯ᵤ ty.(ty_size))%T)) (λ v, v.2) (λ v z, v.1 = z.1).
   Proof.
     iIntros ([l x] [ | d] v tid G ?)  "LFT E L G [Hgho %Hphys] Hd //=".
     iDestruct "Hgho" as "(Hown & Hfree & Hgho)".
@@ -298,7 +261,7 @@ Section typing.
     iSplit. { iPureIntro. intros Hsok. rewrite ConcreteEq; trivial. }
     rewrite /ty_own.
     iSplitL "Hgho".
-    { iNext. iSplitL => //. 
+    { iNext. iSplitL => //.
       iPoseProof (ty_gho_depth_mono _ d (S d) (S d) (S d) with "Hgho") as "[? _]"; [lia..|done]. }
     iIntros "Hown".
     iModIntro.
@@ -313,53 +276,54 @@ Section typing.
 
   Lemma type_new_instr n E L I :
     0 ≤ n → let n' := Z.to_nat n in
-    typed_instr_ty E L I +[] (new [ #n])%E (own_ptr n' (↯ n'))
-        (λ post _ mask π, ∀ l junk, post (l, junk) mask π).
+    typed_instr_ty E L I +[] (new [ #n])%E (own_ptr n' ((↯ᵤ n')%T))
+        (λ post _ mask, ∀ l junk, post (l, junk) mask).
   Proof.
-    iIntros (???????) "_ TIME _ _ _ $$ _ Proph". iMod persistent_time_receipt_0 as "⧖".
-    iApply wp_fupd.
-    iApply (wp_persistent_time_receipt with "TIME ⧖"); [done|].
-    iIntros "? #⧖".
-    iApply wp_new=>//; [lia|].
-    iIntros "!>" (l) "(† & ↦)". iExists -[(l, vrepeat #☠ (Z.to_nat n))].
-    iModIntro.
-    iSplit.
-    { simpl. rewrite /tctx_elt_interp. 
-      iSplit => //=.
-      rewrite /ty_own /=.
-      iExists #l, 1%nat.
-      iFrame "⧖".
-      rewrite/= freeable_sz_full Z2Nat.id; [|lia].
-      iSplit => //.
-      iSplit => //.
-      rewrite vec_to_list_vrepeat. iFrame.
-      rewrite heap_mapsto_fancy_fmap_eq. iFrame. done.
-    }
-    simpl.
-    iApply proph_obs_impl; last by iFrame "Proph".
+    iIntros (Hn n' tid post mask iκs []) "_ #TIME _ $ $ _ %Obs".
+    iApply pgl_wp_fupd.
+    iApply (wp_cumulative_time_receipt1 with "TIME"); [done|solve_ndisj|].
+    iIntros "⧗1".
+    iApply wp_new; [lia|done|].
+    iIntros "!>" (l) "[Hfree Hmap]".
+    iMod persistent_time_receipt_0 as "#⧖0".
+    iMod (cumulative_persistent_time_receipt _ 1 0 with "TIME ⧗1 ⧖0") as "#⧖1";
+      [solve_ndisj|].
+    iModIntro. iExists -[(l, vrepeat #☠ n')].
+    rewrite /tctx_elt_interp /=. iSplit; last (iPureIntro; by apply Obs).
+    iSplit; last done.
+    iExists (LitV (LitLoc l)), 1%nat.
+    iSplit; first done.
+    iAssert (⧖1)%I with "[]" as "#⧖1'".
+    { iApply (persistent_time_receipt_mono with "⧖1"). lia. }
+    iFrame "⧖1'".
+    rewrite /ty_own /=. iSplitL; last done.
+    iSplitL "Hmap".
+    { rewrite vec_to_list_vrepeat -heap_mapsto_fancy_fmap_eq.
+      change (Z.to_nat n) with n'. iFrame "Hmap". }
+    iSplitL "Hfree".
+    { rewrite /n'. iApply freeable_sz_full.
+      iDestruct "Hfree" as "[$|%Heq]". iRight. iPureIntro. lia. }
     done.
   Qed.
 
   Lemma type_new {𝔄l 𝔅} n x e tr E L (I: invctx) (C: cctx 𝔅) (T: tctx 𝔄l) :
     Closed (x :b: []) e → 0 ≤ n → let n' := Z.to_nat n in
-    (∀v: val, typed_body E L I C (v ◁ own_ptr n' (↯ n') +:: T) (subst' x v e) tr) -∗
+    (∀v: val, typed_body E L I C (v ◁ own_ptr n' ((↯ᵤ n')%T) +:: T) (subst' x v e) tr) -∗
     typed_body E L I C T (let: x := new [ #n] in e)
-      (λ post al mask π, forall l junk, tr post ((l, junk) -:: al) mask π).
+      (λ post al mask, forall l junk, tr post ((l, junk) -:: al) mask).
   Proof.
-    iIntros. 
-    iApply type_let. 
+    iIntros. iApply type_let.
     - by apply type_new_instr.
     - solve_typing.
-    - instantiate (1 := tr).
-      done.
+    - instantiate (1 := tr). done.
     - done.
   Qed.
 
   Lemma type_new_subtype {𝔄 𝔅l ℭ} (ty: type 𝔄) n (T: tctx 𝔅l) f e tr x E L I (C: cctx ℭ) :
     Closed (x :b: []) e → 0 ≤ n → let n' := Z.to_nat n in
-    subtype E L (↯ n') ty f →
+    subtype E L ((↯ᵤ n')%T) ty f →
     (∀v: val, typed_body E L I C (v ◁ own_ptr n' ty +:: T) (subst' x v e) tr) -∗
-    typed_body E L I C T (let: x := new [ #n] in e) (λ post al mask π, forall l junk, tr post ((l, f ~~$ₛ junk) -:: al) mask π).
+    typed_body E L I C T (let: x := new [ #n] in e) (λ post al mask, forall l junk, tr post ((l, f ~~$ₛ junk) -:: al) mask).
   Proof.
     iIntros (??? Sub) "?".
     iApply type_let; [by apply type_new_instr|solve_typing| |]; last first.
@@ -374,19 +338,19 @@ Section typing.
     typed_instr E L I +[p ◁ own_ptr n' ty] (new_delete.delete [ #n; p])%E (λ _, +[])
       (λ post _, post -[]).
   Proof.
-    iIntros (?->? ? ? ? [[l x][]]) "_ _ _ _ _ $$ [p _] #Obs". 
-    wp_bind p.
-    iApply (wp_hasty with "p"). 
+    iIntros (?->????[[l x][]]) "_ _ _ $ $ [p _] %Obs". wp_bind p.
+    iApply (wp_hasty with "p").
     rewrite /ty_own /=.
-    iIntros (?[|?] _) "? [own %]"; [done|].
-    iDestruct "own" as "(Hown & Hfree & Hgho)".
+    iIntros (?[|d] _) "_ [own %H]"; [done|].
+    iDestruct "own" as "(Hmap & Hfree & _)".
     move: H; case => <-.
-    pose proof (ty.(ty_size_eq) ) as Sz.
-    iMod (mapsto_vec_untether_emp _ _ _ ∅ with "Hown") as (vl_concrete) "[Hconc [%Hleneq _]]".
-    iApply (wp_delete vl_concrete n' with "[-] []")=>//.
-    {  unfold n'. rewrite Hleneq. by rewrite Sz. }
-    { iFrame. rewrite Hleneq. rewrite Sz. by iApply freeable_sz_full. }
-    { iNext. iIntros. iExists nil_tt. iSplit => //; iFrame. }
+    pose proof (ty.(ty_size_eq)) as Sz.
+    iMod (mapsto_vec_untether_emp _ _ _ ∅ with "Hmap")
+      as (vl_concrete) "[Hconc [%Hleneq _]]".
+    iApply (wp_delete vl_concrete _ l with "[Hconc Hfree] []") => //.
+    { rewrite /n' Hleneq. by rewrite Sz. }
+    { iFrame "Hconc". rewrite Hleneq Sz. by iApply freeable_sz_full. }
+    iNext. iIntros "_". iExists -[]. by iSplit.
   Qed.
 
   Lemma type_delete {𝔄 𝔅l ℭl 𝔇} (ty: type 𝔄) n' (n: Z) p e
@@ -398,9 +362,7 @@ Section typing.
     iIntros (? Extr -> ?) "?". iApply type_seq; [by eapply type_delete_instr|done| |done].
     destruct Extr as [Htrx _]=>?? /=. apply Htrx. by case.
   Qed.
-  
-  (* T to Tracked<T> *)
-  
+
   Lemma type_delete2_instr {𝔄} (ty: type 𝔄) (n: Z) p E L I :
     let n' := ty.(ty_size) in n = Z.of_nat n' →
     typed_instr E L I
@@ -409,111 +371,124 @@ Section typing.
       (λ _, +[p ◁ own_tracked ty])
       (λ post π, post π).
   Proof.
-    iIntros (?->? ? ? ? [[l x][]]) "? ? ? ? ? $$ [p _] #Obs". 
-    wp_bind p.
-    iApply (wp_hasty with "p"). 
+    iIntros (?->????[[l x][]]) "_ _ _ $ $ [p _] %Obs". wp_bind p.
+    iApply (wp_hasty with "p").
     rewrite /ty_own /=.
-    iIntros (?[|?] Hpath) "#⧖ [own %Hv]"; [done|]. 
-    iDestruct "own" as "(Hown & Hfree & Hgho)".
-    inversion Hv. subst v.
-    pose proof (ty.(ty_size_eq) ) as Sz.
-    iMod (mapsto_vec_untether_emp  _ _ _ ∅ with "Hown") as (vl_concrete) "[Hconc [%Hleneq _]]".
-    iApply (wp_delete (vl_concrete) n' with "[Hconc Hfree] [Hgho]")=>//.
-    {  unfold n'. rewrite Hleneq. by rewrite Sz. }
-    { iFrame. rewrite Hleneq. rewrite Sz. by iApply freeable_sz_full. }
-    { iNext. iIntros. iExists -[(l, x)]. iSplit => //; iFrame.
-      iSplit; last by done. unfold tctx_elt_interp.
-      iExists (#l), (S n). iSplit. { iPureIntro. by symmetry. }
-      iFrame "⧖". iSplit. { iFrame. simpl. rewrite heap_mapsto_fancy_vec_nil. done. }
-      iPureIntro. done.
-    }
+    iIntros (v [|d] Hpath) "#⧖ [own %H]"; [done|].
+    iDestruct "own" as "(Hmap & Hfree & Hgho)".
+    injection H as Hv. subst v.
+    pose proof (ty.(ty_size_eq)) as Sz.
+    iMod (mapsto_vec_untether_emp _ _ _ ∅ with "Hmap")
+      as (vl_concrete) "[Hconc [%Hleneq _]]".
+    iApply (wp_delete vl_concrete _ l with "[Hconc Hfree] [Hgho]") => //.
+    { rewrite /n' Hleneq. by rewrite Sz. }
+    { iFrame "Hconc". rewrite Hleneq Sz. by iApply freeable_sz_full. }
+    iNext. iIntros "_". iExists -[(l, x)]. iSplit; last done.
+    iSplit; last done.
+    rewrite /tctx_elt_interp. iExists (#l), (S d).
+    iSplit. { iPureIntro. exact (eq_sym Hpath). }
+    iFrame "⧖". rewrite /ty_own /=.
+    iSplit; last done.
+    iSplit; last (iSplit; last done).
+    - by iApply heap_mapsto_fancy_vec_nil.
+    - rewrite /freeable_sz /=. done.
+    Unshelve.
+    done.
   Qed.
 
+  (** [type_letalloc_1]: allocate a new size-1 box and immediately
+      write [p]'s value into it.  Inlines alloc + write at WP level,
+      then repackages as [v ◁ box ty].  WIP — proof is admit'd while
+      the inner wp_bind on the assignment step is figured out. *)
   Lemma type_letalloc_1 {𝔄 𝔅l ℭl 𝔇} (ty: type 𝔄) (x: string) p e
-    (T: tctx 𝔅l) (T': tctx ℭl) (tr : predl_trans' ((at_locₛ 𝔄) :: ℭl) 𝔇) (trx : predl_trans 𝔅l ([𝔄] ++ ℭl)) tr_res E L I (C: cctx 𝔇) :
+    (T: tctx 𝔅l) (T': tctx ℭl)
+    (tr: predl_trans' (at_locₛ 𝔄 :: ℭl) 𝔇)
+    (trx: predl_trans 𝔅l (𝔄 :: ℭl)) E L (I: invctx) (C: cctx 𝔇) :
     Closed [] p → Closed [x] e →
     tctx_extract_ctx E L +[p ◁ ty] T T' trx →
-    tr_res ≡ (λ pred_d, trx (λ '(a -:: cl) mask π, ∀ l, tr pred_d ((l, a) -:: cl) mask π) ) →
     ty.(ty_size) = 1%nat →
     (∀v: val, typed_body E L I C (v ◁ box ty +:: T') (subst x v e) tr) -∗
-    typed_body E L I C T (letalloc: x <- p in e) tr_res.
+    typed_body E L I C T (letalloc: x <- p in e)
+      (trx ∘ (λ post '(a -:: cl) mask, ∀ l, tr post ((l, a) -:: cl) mask))%type.
   Proof.
-    iIntros (???? Sz) "?".
-    iApply (typed_body_impl _ (_ ∘ _)).
-    { move => post xl mask π Htr_res.
-      apply H2 in Htr_res.
-      apply Htr_res. }
-    iApply typed_body_tctx_incl; [done|].
-    set (tr' := (λ post (al : plist ~~ (at_locₛ (uninitₛ (Z.to_nat (Z.of_nat 1))):: 𝔄 :: ℭl)) mask π, let '( (l, junk) -:: a -:: rest) := al in tr post ((l,a) -:: rest) mask π)).
-    iApply (@typed_body_impl _ _ (𝔄 :: ℭl) _ _ (λ post al mask π, ∀ l junk, tr' post ((l, junk) -:: al) mask π)); last first.
-    - iApply (@type_new (𝔄 :: ℭl) 𝔇 _ _ _ tr'); [|lia|].
-      + rewrite /Closed /= !andb_True. split; [done|]. split; [|done].
-        split; [apply bool_decide_spec|eapply is_closed_weaken=>//]; set_solver.
-      + iIntros (xv) "/=".
-        have ->: (subst x xv (x <- p;; e))%E = (xv <- p;; subst x xv e)%E.
-        { rewrite /subst /=.
-          repeat f_equal;
-            [by rewrite bool_decide_true|eapply is_closed_subst=>//; set_solver]. }
-        iApply typed_body_impl; last first.
-        { iApply (type_assign (own_ptr (Z.to_nat 1%nat) (↯ (Z.to_nat 1%nat))) (↯ (Z.to_nat 1%nat))%T (own_ptr (Z.to_nat 1%nat) ty) ty snd _ _ _ _ _ _ _ _ _ T' id tr _).
-          * apply subst_is_closed; [apply is_closed_of_val|done].
-          * eapply tctx_extract_ctx_eq.
-            eapply tctx_extract_ctx_elt.
-            apply tctx_extract_elt_here_exact.
-            eapply tctx_extract_ctx_elt.
-            apply tctx_extract_elt_here_exact.
-            apply tctx_extract_ctx_nil.
-            rewrite /id /compose/trans_tail //=.
-            fun_ext => a.
-            fun_ext => b /=.
-            by destruct b as [[? ?] [? ?]].
-          * apply (write_own (↯ (Z.to_nat 1%nat)) ty 1%nat ) => /=; lia.
-          * rewrite /resolve'.
-            instantiate (1:= λ _ _ x, x).
-            eapply resolve_impl => //; first apply uninit_resolve.
-          * by rewrite /box Sz.
-        }
-        move=>/= ?[[??][? ?]]????/=?; subst.
-        done.
-    - move => ?[??]????? //=.
+    iIntros (Hclp Hclxe Extr Sz) "Hbody".
+    iApply typed_body_tctx_incl; [apply Extr|].
+    iIntros (tid xl mask post iκs).
+    destruct xl as [a cl].
+    iIntros "#LFT #TIME #E L Hinv Hcctx [Hp Hrest] %Obs".
+    (* Destruct [Hp] to get the value of [p]. *)
+    rewrite /tctx_elt_interp /=.
+    iDestruct "Hp" as (vp dp Hev_p) "[#⧖dp Hty]".
+    iDestruct "Hty" as "[Hgho %Hphys]".
+    pose proof (ty.(ty_size_eq) a tid) as Hlen.
+    rewrite Sz in Hlen. rewrite Hphys in Hlen. simpl in Hlen.
+    (* WP setup: prove Closed for letalloc's Lam body. *)
+    have Hp_iclosed : is_closed [x] p
+      by (eapply is_closed_weaken; [exact Hclp|set_solver]).
+    have Hbd : (bool_decide (x ∈ [x]) = true)
+      by (apply bool_decide_eq_true; set_solver).
+    assert (Hclbody : Closed (<> :b: [x]%binder +b+ []) (x <- p ;; e)%E).
+    { hnf. cbn.
+      apply Is_true_eq_true in Hclxe.
+      apply Is_true_eq_true in Hp_iclosed.
+      rewrite Hbd Hp_iclosed Hclxe //. }
+    (* Step the [new [#1]] allocation in the let's RHS *)
+    iApply pgl_wp_fupd.
+    iApply (pgl_wp_bind (fill_item (LetCtx _ _))).
+    iApply (wp_cumulative_time_receipt1 with "TIME"); [done|solve_ndisj|].
+    iIntros "⧗1".
+    iApply wp_new; [lia|done|].
+    iIntros "!>" (lbb) "[Hfree Hbb]".
+    iApply fupd_pgl_wp.
+    iMod (cumulative_persistent_time_receipt ⊤ 1 dp with "TIME ⧗1 ⧖dp")
+      as "#⧖Sdp"; [solve_ndisj|].
+    iModIntro.
+    (* Step the let: beta-reduce on [#lbb]. *)
+    wp_let.
+    have ->: subst x (#lbb) (x <- p ;; e)%E =
+             ((#lbb <- subst x #lbb p) ;; subst x #lbb e)%E.
+    { rewrite /subst /=. rewrite (bool_decide_true (x = x) eq_refl).
+      reflexivity. }
+    rewrite (is_closed_nil_subst p x #lbb); [|exact Hclp].
+    have Hcl_subste : Closed [] (subst x #lbb e).
+    { eapply subst_is_closed; [|exact Hclxe]. apply is_closed_of_val. }
+    (* Bind to [#lbb <- p] (Seq's first arg) and then to [p] (Write's RHS). *)
+    iApply (pgl_wp_bind (fill_item (SeqCtx _))).
+    iApply (pgl_wp_bind (fill_item (WriteRCtx (LitV (LitLoc lbb))))).
+    iApply (pgl_wp_wand with "[]"); first by iApply (wp_eval_path _ p vp).
+    iIntros (v ->). simpl.
+    rewrite Z2Nat.inj_pos /=.
+    iEval (rewrite heap_mapsto_vec_singleton) in "Hbb".
+    wp_write; first solve_ndisj.
+    wp_seq.
+    (* Apply inner typed_body with v = #lbb (the new box).  Goal's
+       postcondition has [|={⊤}=>] wrapper from the earlier
+       [iApply pgl_wp_fupd]; weaken via [pgl_wp_mono] to match
+       Hbody's plain [cont_postcondition] shape. *)
+    iApply (pgl_wp_mono _ _ _ (λ _, cont_postcondition)); first by iIntros (v) "$".
+    iApply ("Hbody" $! (LitV (LitLoc lbb)) tid ((lbb, a) -:: cl) mask post iκs
+            with "LFT TIME E L Hinv Hcctx [Hbb Hfree Hgho Hrest] [%]").
+    { simpl. iSplitR "Hrest"; last by iFrame "Hrest".
+      rewrite /tctx_elt_interp /=. iExists #lbb, (S dp).
+      iSplit; first done.
+      iAssert (⧖(S dp))%I as "#⧖Sdp_alt".
+      { rewrite -Nat.add_1_l. iApply "⧖Sdp". }
+      iFrame "⧖Sdp_alt".
+      rewrite /ty_own /=. iSplit; last done.
+      iSplitL "Hbb".
+      { rewrite -heap_mapsto_vec_singleton -(heap_mapsto_fancy_fmap_eq lbb [vp]).
+        simpl. rewrite Hphys. iFrame. }
+      iSplitL "Hfree".
+      { rewrite Sz. iApply freeable_sz_full.
+        iDestruct "Hfree" as "[$|%H]". iRight. iPureIntro. lia. }
+      iNext.
+      iDestruct (ty.(ty_gho_depth_mono) dp dp dp (S dp) a tid with "Hgho")
+        as "[$ _]"; [lia|lia]. }
+    by apply Obs.
   Qed.
-
-  (* Lemma type_letalloc_n {𝔄 𝔅 𝔅' ℭl 𝔇l 𝔈} (ty: type 𝔄) (tyr: type 𝔅) *)
-  (*       (tyr': type 𝔅') gt st (T: tctx ℭl) (T': tctx 𝔇l) trx tr (x: string) *)
-  (*       p e E L (C: cctx 𝔈) : *)
-  (*   Closed [] p → Closed [x] e → tctx_extract_ctx E L +[p ◁ tyr] T T' trx → *)
-  (*   typed_read E L tyr ty tyr' gt st → *)
-  (*   (∀v: val, typed_body E L C (v ◁ box ty +:: p ◁ tyr' +:: T') (subst x v e) tr) -∗ *)
-  (*   typed_body E L C T (letalloc: x <-{ty.(ty_size)} !p in e) (trx ∘ *)
-  (*     (λ post '(b -:: bl), tr post (gt b -:: st b -:: bl))). *)
-  (* Proof. *)
-  (*   iIntros. iApply typed_body_tctx_incl; [done|]. *)
-  (*   iApply typed_body_impl; last first. *)
-  (*   { iApply type_new; [|lia|]=>/=. *)
-  (*     - rewrite /Closed /=. rewrite !andb_True. *)
-  (*       eauto 10 using is_closed_of_val, is_closed_weaken with set_solver. *)
-  (*   - iIntros (xv). *)
-  (*     have ->: subst x xv (x <-{ty.(ty_size)} !p;; e)%E = *)
-  (*              (xv <-{ty.(ty_size)} !p;; subst x xv e)%E. *)
-  (*     { rewrite /subst /=. repeat f_equal. *)
-  (*       - eapply (is_closed_subst []); [apply is_closed_of_val|set_solver]. *)
-  (*       - by rewrite bool_decide_true. *)
-  (*       - eapply is_closed_subst; [done|set_solver]. } *)
-  (*     rewrite Nat2Z.id. iApply type_memcpy. *)
-  (*     + apply subst_is_closed; [apply is_closed_of_val|done]. *)
-  (*     + solve_typing. *)
-  (*     + by apply (write_own ty (uninit _)). *)
-  (*     + solve_typing. *)
-  (*     + done. *)
-  (*     + done. *)
-  (*     + done. } *)
-  (*     by move=>/= ?[??]?. *)
-  (* Qed. *)
 
 End typing.
 
-Global Hint Resolve own_resolve own_subtype own_eqtype
+Global Hint Resolve own_subtype own_eqtype
   box_subtype box_eqtype write_own read_own_copy : lrust_typing.
-(* By setting the priority high, we make sure copying is tried before
-   moving. *)
 Global Hint Resolve read_own_move | 100 : lrust_typing.

@@ -321,16 +321,24 @@ Section error_rules.
     { apply Rnot_lt_ge, Rge_le in Hdec.
       iApply exec_stutter_spend.
       iPureIntro. simpl. lra. }
-    iApply exec_stutter_free. iNext.
+    iApply exec_stutter_free.
+    iIntros "Hcred".
+    iDestruct (lc_succ with "Hcred") as "[Hc1 Hcred_rest]".
+    simpl.
+    iMod (lc_fupd_elim_later with "Hc1 HΦ") as "HΦ".
     iMod (ec_supply_increase ε3 (mknonnegreal _ (Hleq1 (Z.to_nat n))) with "[Hε2]")
       as "[Hε2 Hcr]".
     { simpl. lra. }
     { iApply ec_supply_eq; [|done]. simplify_eq. lra. }
     iMod "Hclose'".
     iMod (time_interp_step with "Ht") as "Ht".
-    iApply fupd_mask_intro; [eauto|]. iIntros "_". iFrame "Hσ Ht Hε2".
-    replace (Lit (LitInt n)) with (of_val (LitV (LitInt n))) by reflexivity.
-    iApply pgl_wp_value'.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose2". iFrame "Hσ Ht Hε2".
+    iApply bi.later_intro.
+    iApply fupd_intro.
+    iApply (step_fupdN_intro ∅ ∅ (sum_advance_credits (ns + 1))); [done|].
+    iApply (bi.laterN_intro (sum_advance_credits (ns + 1))).
+    iMod "Hclose2".
+    iApply (pgl_wp_value _ _ _ (Lit (LitInt n)) (LitV (LitInt n))); [done|].
     replace (LitV (LitInt n)) with (LitV (LitInt (Z.of_nat (Z.to_nat n)))); last first.
     { f_equal. f_equal. by rewrite Z2Nat.id. }
     iApply "HΦ". iFrame. iPureIntro. lia.

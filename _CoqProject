@@ -86,33 +86,31 @@ src/lambda_verus/typing/base.v
 src/lambda_verus/typing/lifetime.v
 src/lambda_verus/typing/lft_contexts.v
 src/lambda_verus/typing/inv_context.v
-src/lambda_verus/typing/proph_stubs.v
 src/lambda_verus/typing/type.v
 src/lambda_verus/typing/type_context.v
 src/lambda_verus/typing/cont_context.v
 src/lambda_verus/typing/programs.v
 src/lambda_verus/typing/bool.v
 src/lambda_verus/typing/int.v
-src/lambda_verus/typing/tracked.v
 src/lambda_verus/typing/rand_ubig.v
 # src/lambda_verus/typing/cont_context.v
 # src/lambda_verus/typing/programs.v
 # src/lambda_verus/typing/bool.v
 # src/lambda_verus/typing/int.v
-# src/lambda_verus/typing/cont.v
-# src/lambda_verus/typing/product.v
+src/lambda_verus/typing/cont.v
+src/lambda_verus/typing/product.v
 # src/lambda_verus/typing/programs_util.v
 # src/lambda_verus/typing/programs_util_own.v
 # src/lambda_verus/typing/shr_bor.v
 # # src/lambda_verus/typing/uniq_util.v
 # src/lambda_verus/typing/ghost.v
-# # src/lambda_verus/typing/uninit.v
-# src/lambda_verus/typing/freeable_util.v
-# src/lambda_verus/typing/own.v
+# src/lambda_verus/typing/uninit.v
+src/lambda_verus/typing/freeable_util.v
+src/lambda_verus/typing/own.v
 # src/lambda_verus/typing/pptr.v
 # src/lambda_verus/typing/pcell.v
-# src/lambda_verus/typing/tracked.v
-# src/lambda_verus/typing/mod_ty.v
+src/lambda_verus/typing/tracked.v
+src/lambda_verus/typing/mod_ty.v
 # src/lambda_verus/typing/product_split.v
 # src/lambda_verus/typing/type_sum.v
 # # src/lambda_verus/typing/borrow.v
@@ -120,14 +118,15 @@ src/lambda_verus/typing/rand_ubig.v
 # src/lambda_verus/typing/ra.v
 # src/lambda_verus/typing/protocol.v
 # src/lambda_verus/typing/local_inv.v
-# src/lambda_verus/typing/function.v
+src/lambda_verus/typing/function.v
 # src/lambda_verus/typing/base_type.v
 # src/lambda_verus/typing/fixpoint.v
 src/lambda_verus/typing/soundness.v
 # Removed (prophecy-based, eris is unsound under prophecies): borrow.v,
 # uniq_bor.v, uniq_cmra.v, uniq_util.v.
 
-# src/lambda_verus/typing/examples/assert.v
+src/lambda_verus/typing/examples/assert.v
+src/lambda_verus/typing/examples/coin_flip.v
 # src/lambda_verus/typing/examples/list.v
 # src/lambda_verus/typing/examples/pcell_example.v
 

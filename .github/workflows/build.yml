@@ -33,18 +33,16 @@ jobs:
           custom_image: ${{ matrix.image }}
           install: |
             startGroup "Configure opam repositories"
-              opam repo add --this-switch rocq-released \
-                https://rocq-prover.org/opam/released || true
-              opam repo add --this-switch iris-dev \
-                https://gitlab.mpi-sws.org/iris/opam.git || true
+              opam repo add --this-switch rocq-released https://rocq-prover.org/opam/released || true
+              opam repo add --this-switch iris-dev https://gitlab.mpi-sws.org/iris/opam.git || true
               opam update -y
             endGroup
             startGroup "Pin VerusBelt-specific dependencies"
+              apt-get install rsync -y
               opam pin add -n -y -k git rocq-clutch.dev \
                 git+https://github.com/logsem/clutch.git#eris-lc-step
               opam pin add -n -y -k path $PACKAGE $WORKDIR
-              opam install --confirm-level=unsafe-yes -j 2 $PACKAGE \
-                --deps-only --ignore-constraints-on=rocq-stdpp
+              opam install --confirm-level=unsafe-yes -j 2 $PACKAGE --deps-only --ignore-constraints-on=rocq-stdpp
             endGroup
           script: |
             startGroup Build

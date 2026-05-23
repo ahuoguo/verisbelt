@@ -23,6 +23,8 @@ depends: [
   "coq-mathcomp-analysis" {= "1.14.0"}
 ]
 pin-depends: [
+  [ "rocq-iris.dev"
+    "git+https://gitlab.mpi-sws.org/iris/iris.git#93c7df745a0485cebcb97ca77e7d263e5c920d4f" ]
   [ "rocq-clutch.dev"
     "git+https://github.com/logsem/clutch.git#eris-lc-step" ]
 ]

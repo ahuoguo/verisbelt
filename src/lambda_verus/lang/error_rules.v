@@ -101,6 +101,19 @@ Section error_rules.
     iApply (wp_err_incr with "[$]"); auto.
   Qed.
 
+  Lemma wp_err_pos_post e E Φ :
+    to_val e = None →
+    WP e @ E {{ Φ }} ⊢
+      WP e @ E {{ v, ∃ ε : R, ⌜(0 < ε)%R⌝ ∗ ↯ ε ∗ Φ v }}.
+  Proof.
+    iIntros (Hnv) "Hwp".
+    iApply wp_err_pos; first done.
+    iIntros (ε Hε) "Hcr".
+    iApply (pgl_wp_wand with "Hwp").
+    iIntros (v) "HΦ".
+    iExists ε. iFrame "Hcr HΦ". iPureIntro. exact Hε.
+  Qed.
+
   (** Expectation-preserving rand sampling.
 
       For [Rand z] (with [0 < z]), we sample [n : fin (Z.to_nat z)]

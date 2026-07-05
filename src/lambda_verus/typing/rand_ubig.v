@@ -98,6 +98,31 @@ Section error_credit_type.
   Definition error_credit_ty (ε : R) : type (at_locₛ (trackedₛ unitₛ)) :=
     own_ptr_0 (tracked_ty (error_credit_core ε)).
 
+  (** [error_credit_some_core]: existential-credit ghost core.  The
+      [ε] is hidden under [ty_gho := ∃ε>0, ↯ε], mirroring Verus's
+      opaque [Tracked<ErrorCreditResource>] whose [view()] returns
+      [Carrier(ε)] under an existential. *)
+  Program Definition error_credit_some_core : type unitₛ := {|
+    ty_size := 0;
+    ty_lfts := [];
+    ty_E := [];
+    ty_gho _ _ _ _ := (∃ ε : R, ⌜(0 < ε)%R⌝ ∗ ↯ ε)%I;
+    ty_gho_pers _ _ _ _ := True%I;
+    ty_phys _ _ := [];
+  |}%I.
+  Next Obligation. done. Qed.
+  Next Obligation. done. Qed.
+  Next Obligation. done. Qed.
+  Next Obligation. iIntros (?????? _ _) "$". by iIntros "$". Qed.
+  Next Obligation. iIntros (?????? _ _). by iIntros "$". Qed.
+  Next Obligation. by iIntros. Qed.
+
+  (** [error_credit_some_ty]: location-handle wrapper around
+      [error_credit_some_core].  Carries [∃ε>0, ↯ε] in its ghost
+      payload. *)
+  Definition error_credit_some_ty : type (at_locₛ (trackedₛ unitₛ)) :=
+    own_ptr_0 (tracked_ty error_credit_some_core).
+
 End error_credit_type.
 
 (** Notation: [↯_T ε] mirrors the eris [↯ ε] but at the typing layer. *)
@@ -115,6 +140,43 @@ Section typing_rules.
     (∀ ε : R, ⌜(0 < ε)%R⌝ -∗ ↯ ε -∗ WP e @ E {{ Φ }}) ⊢
     WP e @ E {{ Φ }}.
   Proof. apply wp_err_pos. Qed.
+
+  (** [type_thin_air_instr]: Verus's [thin_air()] at the typing layer.
+      Mints a fresh [↯_T ε] at a user-supplied path [c] (which must
+      evaluate to a literal location [l], typically picked as a magic
+      handle like [#(LitLoc (42%positive, 1337))]).  The location is
+      a tctx artifact only — no allocation happens.
+
+      Soundness note (matches the Verus comment): the underlying
+      [wp_err_pos] only fires inside a WP/fupd, which is exactly the
+      shape of [typed_instr]'s body.  Asserting [∃ε>0, ↯ε] outside
+      such a context would be unsound. *)
+  Lemma type_thin_air_instr {𝔅l}
+      (c : path) (l : loc) (e : expr) (T' : val → tctx 𝔅l)
+      (tr : predl_trans [] 𝔅l) E L I :
+    eval_path c = Some (LitV (LitLoc l)) →
+    to_val e = None →
+    (∀ ε : R, (0 < ε)%R →
+        typed_instr E L I +[c ◁ ↯_T ε] e T'
+          (λ post '-[_], λ mask, tr post -[] mask)) →
+    typed_instr E L I +[] e T' tr.
+  Proof.
+    iIntros (Hev Hnv Hinner tid post mask iκs []).
+    iIntros "#LFT #TIME #E_ HL Hinv _ %Hpre".
+    iApply type_thin_air; first done.
+    iIntros (ε Hε) "Hcr".
+    iApply fupd_pgl_wp.
+    iMod persistent_time_receipt_0 as "#⧖0".
+    iModIntro.
+    iApply (Hinner ε Hε tid post mask iκs -[(l, ())]
+            with "LFT TIME E_ HL Hinv [Hcr] [//]").
+    iSplit; last done.
+    rewrite /tctx_elt_interp /=.
+    iExists (LitV (LitLoc l)), 0%nat.
+    iSplit; first done.
+    iFrame "⧖0".
+    rewrite /ty_own /=. by iFrame "Hcr".
+  Qed.
 
   Lemma type_thin_air_incr_instr {𝔅l}
       (ε : R) (c : path) (e : expr) (T' : val → tctx 𝔅l)
@@ -137,6 +199,51 @@ Section typing_rules.
     rewrite /tctx_elt_interp /=.
     iSplit; last done.
     iExists v, d. iFrame "⧖d Hcr'". iSplit; done.
+  Qed.
+
+  (** [type_thin_air_post_instr]: typed-instr analog of
+      [wp_err_pos_post].  Given any [typed_instr], strengthens its
+      output tctx with a fresh [c ◁ error_credit_some_ty] — the credit
+      type whose [ty_gho] contains [∃ ε > 0, ↯ ε].  This puts the
+      existential *inside* the type rather than in a CPS quantifier,
+      matching Verus's [thin_air] ensures-clause shape literally:
+
+          ensures ∃ε>0, ret.view() = Carrier(ε)
+
+      Like [wp_err_pos_post], soundness comes from the underlying
+      [wp_err_pos] which only fires inside a WP — the proof invokes
+      it on the WP that [typed_instr] unfolds to. *)
+  Lemma type_thin_air_post_instr {𝔄l 𝔅l}
+      (T: tctx 𝔄l) (e : expr) (T' : val → tctx 𝔅l)
+      (c : path) (l : loc) (tr : predl_trans 𝔄l 𝔅l) E L I :
+    eval_path c = Some (LitV (LitLoc l)) →
+    to_val e = None →
+    typed_instr E L I T e T' tr →
+    typed_instr E L I T e
+      (λ v, (c ◁ error_credit_some_ty) +:: T' v)
+      (λ post, tr (λ outs mask, post ((l, ()) -:: outs) mask)).
+  Proof.
+    iIntros (Hev Hnv Hinner tid post mask iκs xl).
+    iIntros "#LFT #TIME #E_ HL Hinv T %Hpre".
+    iApply pgl_wp_fupd.
+    iApply wp_err_pos; first done.
+    iIntros (ε Hε) "Hcr".
+    iApply (pgl_wp_wand with "[HL Hinv T]").
+    { iApply (Hinner tid (λ outs mask, post ((l, ()) -:: outs) mask)
+                    mask iκs xl with "LFT TIME E_ HL Hinv T [//]"). }
+    iIntros (v) "(%xl' & HL & Hinv & Ht & %Hpost)".
+    iMod persistent_time_receipt_0 as "#⧖0".
+    iModIntro.
+    iExists ((l, ()) -:: xl').
+    iFrame "HL Hinv".
+    iSplit; last by iPureIntro.
+    iSplitL "Hcr".
+    - rewrite /tctx_elt_interp /=.
+      iExists (LitV (LitLoc l)), 0%nat.
+      iSplit; first done. iFrame "⧖0".
+      rewrite /ty_own /=. iSplit; last done.
+      iExists ε. iFrame "Hcr". by iPureIntro.
+    - iFrame.
   Qed.
 
   (** [rand_ubig] in iris triple form (the most directly usable form). *)

@@ -4,9 +4,9 @@ maintainer: ["ahuoguo@gmail.com"]
 authors: ["VerusBelt authors"]
 license: "BSD-3-Clause"
 tags: ["separation logic" "rust" "verus"]
-homepage: "https://github.com/ahuoguo/verisbelt"
-bug-reports: "https://github.com/ahuoguo/verisbelt/issues"
-dev-repo: "git+https://github.com/ahuoguo/verisbelt.git"
+homepage: "https://github.com/ahuoguo/alerusbelt"
+bug-reports: "https://github.com/ahuoguo/alerusbelt/issues"
+dev-repo: "git+https://github.com/ahuoguo/alerusbelt.git"
 depends: [
   "rocq-core" {>= "9.1.1" & < "9.2~"}
   "rocq-stdlib" {>= "9.0.0" & < "9.2~"}

@@ -56,7 +56,8 @@ Section lifetimes.
     lft_intersect_list (l1 ++ l2) = lft_intersect_list l1 ⊓ lft_intersect_list l2.
   Proof. induction l1 as [ | κ l1' IH ] in l2 |- * => /=; by [rewrite left_id_L| rewrite IH assoc_L]. Qed.
 
-  Lemma lft_incl_refl κ : ⊢ κ ⊑ κ. by iApply guards_refl. Qed.
+  Lemma lft_incl_refl κ : ⊢ κ ⊑ κ. 
+  Proof. by iApply guards_refl. Qed.
   
   Lemma lft_equiv_refl κ : ⊢ lft_equiv κ κ.
   Proof. by iSplit; iApply guards_refl. Qed.

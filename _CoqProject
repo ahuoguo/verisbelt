@@ -45,11 +45,6 @@ src/lambda_verus/lifetime/lifetime_internals/unborrow.v
 src/lambda_verus/lifetime/lifetime_internals/unnest.v
 src/lambda_verus/lifetime/lifetime_full.v
 
-# Out-of-build entries are commented in place. They're being held back
-# until either ported to eris.weakestpre (Scope B polish) or until the
-# prophecy work lands (eris is unsound under prophecies — Clutch
-# POPL'24), at which point the typing layer can be re-enabled.
-
 src/lambda_verus/util/basic.v
 src/lambda_verus/util/vector.v
 src/lambda_verus/util/update.v
@@ -60,10 +55,6 @@ src/lambda_verus/util/cancellable.v
 src/lambda_verus/util/cellmap.v
 src/lambda_verus/util/non_atomic_cell_map.v
 src/lambda_verus/util/atomic_lock_counter.v
-
-# Prophecy infrastructure removed: eris is unsound under prophecies
-# (Clutch POPL'24).  The typing layer below is stripped of prophecy
-# fields ([ty_guard_proph], [pt_non_prophetic], etc.).
 
 # Language definition (opsem and program logic)
 

@@ -95,7 +95,6 @@ Section lifting.
     iMod (time_interp_step with "Ht") as "Ht".
     iModIntro. iFrame "Hσ Ht". by iApply "HΦ".
   Qed.
-
   (** [Alloc]: fresh-block allocation. *)
   Lemma wp_alloc E (n : Z) s :
     (0 < n)%Z →

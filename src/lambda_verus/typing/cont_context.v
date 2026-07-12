@@ -7,7 +7,7 @@ Set Default Proof Using "Type".
 Implicit Type 𝔄: syn_type.
 
 Section cont_context.
-  Context `{!typeG Σ}.
+  Context `{!typeG Σ, !cnaInv_logicG Σ}.
 
   Definition cont_postcondition: iProp Σ := True%I.
 
@@ -24,9 +24,9 @@ Section cont_context.
 
   Definition cctx_elt_interp {𝔄} (tid: thread_id) iκs
     (post: (pred' (~~𝔄))) (c: cctx_elt 𝔄) : iProp Σ :=
-    let 'CCtxe k L Ic T tr := c in ∀vl xl mask,
+    let 'CCtxe k L Ic _ _ T tr := c in ∀vl xl mask,
       llctx_interp L -∗ invctx_interp tid mask iκs Ic -∗ tctx_interp tid (T vl) xl -∗
-        ⟨π, tr post xl mask π⟩ -∗ WP k (map of_val vl) {{ _, cont_postcondition }}.
+        ⌜tr post xl mask⌝ -∗ WP k (map of_val vl) {{ _, cont_postcondition }}.
 
   Definition cctx_interp {𝔄} (tid: thread_id) iκs
     (post: pred' (~~𝔄)) (C: list (cctx_elt 𝔄)) : iProp Σ :=
@@ -40,7 +40,7 @@ Notation "k ◁cont{ L , I , T } tr" := (CCtxe k L I T tr)
   (at level 55, format "k  ◁cont{ L ,  I ,  T }  tr").
 
 Section cont_context.
-  Context `{!typeG Σ}.
+  Context `{!typeG Σ, !cnaInv_logicG Σ}.
 
   Global Instance cctx_interp_permut {𝔄} tid iκs (post: pred' (~~𝔄)) :
     Proper ((≡ₚ) ==> (⊣⊢)) (cctx_interp tid iκs post).
@@ -74,35 +74,40 @@ Section cont_context.
   Proof. by rewrite cctx_interp_cons cctx_interp_nil right_id. Qed.
 
   Definition cctx_incl {𝔄} (E: elctx) (C C': cctx 𝔄) : Prop :=
-    ∀tid iκs postπ, llft_ctx -∗ proph_ctx -∗ uniq_ctx -∗
+    ∀tid iκs postπ, llft_ctx -∗
       elctx_interp E -∗ cctx_interp tid iκs postπ C -∗ cctx_interp tid iκs postπ C'.
 
   Global Instance cctx_incl_preorder {𝔄} E : PreOrder (@cctx_incl 𝔄 E).
   Proof.
-    split; [iIntros (????) "_ _ _ _ $"|].
-    iIntros (??? In In' ???) "#LFT #PROPH #UNIQ #E ?".
-    iApply (In' with "LFT PROPH UNIQ E"). by iApply (In with "LFT PROPH UNIQ E").
+    split; [iIntros (????) "_ _ $"|].
+    iIntros (??? In In' ???) "#LFT #E ?".
+    iApply (In' with "LFT E"). by iApply (In with "LFT E").
   Qed.
 
   Lemma incl_cctx_incl {𝔄} E (C1 C2: cctx 𝔄) : C1 ⊆ C2 → cctx_incl E C2 C1.
   Proof.
-    iIntros (Sub ???) "_ _ _ _ C". iIntros (? In). move/Sub in In. by iApply "C".
+    iIntros (Sub ???) "_ _ C". iIntros (? In). move/Sub in In. by iApply "C".
   Qed.
 
   Lemma cctx_incl_nil {𝔄} E (C: cctx 𝔄) : cctx_incl E C [].
-  Proof. iIntros "%%% _ _ _ _ _ % %In". inversion In. Qed.
+  Proof. iIntros "%%% _ _ _ % %In". inversion In. Qed.
 
   Lemma cctx_incl_cons {𝔄 𝔄l} k L n (T T': vec val n → tctx 𝔄l) tr tr' (I: invctx) (C C': cctx 𝔄) E :
     cctx_incl E C C' → (∀vl, tctx_incl E L (T' vl) (T vl) tr') →
     cctx_incl E (k ◁cont{L, I, T} tr :: C) (k ◁cont{L, I, T'} (tr' ∘ tr) :: C').
   Proof.
-    iIntros (InC InT ???) "LFT PROPH UNIQ E kC". rewrite !cctx_interp_cons. iSplit.
-    - iDestruct "kC" as "[k _]". iIntros (???) "L I T' Obs".
+    (* Original proof used [iMod (proj2 (InT _) ...)] under [WP] but eris's
+       [pgl_wp] ElimModal instance for [|={E}=>P] sometimes fails to be
+       picked up automatically.  Workaround: weaken to a sufficient
+       fact via [pgl_wp_fupd] explicitly. *)
+    iIntros (InC InT ???) "LFT E kC". rewrite !cctx_interp_cons. iSplit.
+    - iDestruct "kC" as "[k _]". iIntros (vl xl mask) "L I T' Obs".
+      iApply fupd_pgl_wp.
       iMod (llctx_interp_make_guarded with "L") as (γ) "[H1 [H2 [#guard #back]]]". { solve_ndisj. }
-      iMod (proj2 (InT _) with "LFT PROPH UNIQ E guard H1 T' Obs") as (?) "(H1 & T & Obs)".
+      iMod (proj2 (InT _) with "LFT E guard H1 T' Obs") as (?) "(H1 & T & Obs)".
       iDestruct ("back" with "H1 H2") as "back'". iMod (fupd_mask_mono with "back'") as "L". { solve_ndisj. }
-      iApply ("k" with "L I T Obs").
-    - iDestruct "kC" as "[_ ?]". by iApply (InC with "LFT PROPH UNIQ E").
+      iModIntro. iApply ("k" with "L I T Obs").
+    - iDestruct "kC" as "[_ ?]". by iApply (InC with "LFT E").
   Qed.
 End cont_context.
 

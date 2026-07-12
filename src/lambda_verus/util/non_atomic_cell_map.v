@@ -1333,15 +1333,27 @@ Section NonAtomicMap.
     iModIntro. iFrame. done.
   Qed.
   
-(*
-  Lemma non_atomic_map_alloc_heap σ
-    : ⊢ |==> ∃ ι, non_atomic_map ι σ.
+  (** Allocate [non_atomic_map ι σ] for any σ whose entries are all
+      in the [RSt 0] state (i.e. fully-readable values, no in-progress
+      writes or active readers). σ = ∅ trivially satisfies this; it
+      also matches the shape of any heap built up by [init_mem]
+      starting from ∅. *)
+  Lemma non_atomic_map_alloc_heap (σ : gmap L (lock_state * V)) :
+    (∀ l ls v, σ !! l = Some (ls, v) → ls = RSt 0%nat) →
+    ⊢ |==> ∃ ι, non_atomic_map ι σ.
   Proof.
-    induction σ using map_ind; first by apply non_atomic_map_alloc_empty.
-    iIntros. iMod IHσ as (ι) "σ".
-    iMod (non_atomic_map_insert with "σ") as "[pt σ]"; first by apply H.
-    iModIntro.
-*)
+    induction σ as [|l ls_v σ Hl IHσ] using map_ind; intros Hwf.
+    { iApply non_atomic_map_alloc_empty. }
+    iMod IHσ as (ι) "σ".
+    { intros l' ls' v' Hl'. apply (Hwf l' ls' v').
+      rewrite lookup_insert_ne; [done|].
+      intros ->. by rewrite Hl' in Hl. }
+    destruct ls_v as [ls v].
+    assert (ls = RSt 0%nat) as ->.
+    { apply (Hwf l ls v). by rewrite lookup_insert_eq. }
+    iMod (non_atomic_map_insert _ l v with "σ") as "[pt σ]"; [done|].
+    iModIntro. iExists ι. by iFrame.
+  Qed.
   
   (** cell stuff *)
   

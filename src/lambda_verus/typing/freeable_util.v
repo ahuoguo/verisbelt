@@ -1,8 +1,5 @@
-From lrust.lang.lib Require Import memcpy.
 From lrust.typing Require Export type.
-From lrust.typing Require Import uninit type_context programs.
-From guarding Require Import guard tactics.
-From lrust.lifetime Require Import lifetime_full.
+From lrust.typing Require Import type_context programs.
 Set Default Proof Using "Type".
 
 Section freeable.

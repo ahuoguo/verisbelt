@@ -138,7 +138,9 @@ Section typing.
     (λ: ["ptr"; "perm"], "ptr")%V.
 
   Lemma typed_pptr_to_own {𝔄} (perm ptr : path) (ty : type 𝔄) E L I :
-    typed_instr E L I +[ptr ◁ ptr_ty; perm ◁ own_ptr 0 (points_to_ty ty)] (PPtr2Own [ptr; perm]) (λ v, +[v ◁ own_ptr (ty_size ty) ty]) (λ post '-[l; (_, (l', x))], λ mask π, l = l' ∧ post -[(l, x)] mask π).
+    typed_instr E L I +[ptr ◁ ptr_ty; perm ◁ own_ptr 0 (points_to_ty ty)] 
+    (PPtr2Own [ptr; perm]) (λ v, +[v ◁ own_ptr (ty_size ty) ty]) 
+    (λ post '-[l; (_, (l', x))], λ mask π, l = l' ∧ post -[(l, x)] mask π).
   Proof.
     move => tid postπ mask iκs vπl.
     iIntros "#LFT #TIME #PROPH UNIQ E L $ TY #Obs" => /=.

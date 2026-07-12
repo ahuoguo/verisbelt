@@ -191,7 +191,8 @@ Section lft_contexts.
     iIntros (Hκ' Hκ'') "HL".
     iDestruct (Hκ' with "HL") as "#Hκ'".
     iDestruct (Hκ'' with "HL") as "#Hκ''".
-    iIntros "!> #HE". iApply llftl_incl_glb. by iApply "Hκ'". by iApply "Hκ''".
+    iIntros "!> #HE". iApply llftl_incl_glb;
+      [by iApply "Hκ'" | by iApply "Hκ''"].
   Qed.
 
   Lemma lctx_lft_incl_intersect_l κ κ' κ'' :
@@ -200,8 +201,8 @@ Section lft_contexts.
   Proof.
     iIntros (Hκ') "HL".
     iDestruct (Hκ' with "HL") as "#Hκ'".
-    iIntros "!> #HE". iApply llftl_incl_trans.
-      by iApply llftl_intersect_incl_l. by iApply "Hκ'".
+    iIntros "!> #HE". iApply llftl_incl_trans;
+      [by iApply llftl_intersect_incl_l | by iApply "Hκ'"].
   Qed.
 
   Lemma lctx_lft_incl_intersect_r κ κ' κ'' :
@@ -210,8 +211,8 @@ Section lft_contexts.
   Proof.
     iIntros (Hκ') "HL".
     iDestruct (Hκ' with "HL") as "#Hκ'".
-    iIntros "!> #HE". iApply llftl_incl_trans.
-      by iApply llftl_intersect_incl_r. by iApply "Hκ'".
+    iIntros "!> #HE". iApply llftl_incl_trans;
+      [by iApply llftl_intersect_incl_r | by iApply "Hκ'"].
   Qed.
 
   (* Lifetime aliveness *)

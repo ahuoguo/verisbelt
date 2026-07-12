@@ -29,26 +29,25 @@ Notation "p ◁ ty" := (TCtx_hasty _ p ty%T) (at level 55).
 Notation "p ◁{ κ } ty" := (TCtx_blocked _ p κ ty%T)
    (at level 55, format "p  ◁{ κ }  ty").
 
-(* [pred] is used by [Nat] *)
-Notation pred' A := (A → Mask → proph_asn → Prop) (only parsing).
+(* [pred] is used by [Nat].  The third [proph_asn] parameter of the
+   original was the prophecy assignment; under stripped prophecy we
+   drop it so predicate transformers are plain Coq functions over
+   inputs / mask. *)
+Notation pred' A := (A → Mask → Prop) (only parsing).
 Notation predl 𝔄l := (pred' (plist indep_interp_of_syn_type 𝔄l)).
 Notation predl_trans 𝔄l 𝔅l := (predl 𝔅l → predl 𝔄l).
 Notation predl_trans' 𝔄l 𝔅 := (pred' (~~𝔅) → predl 𝔄l).
 
 Global Instance pred'_equiv A : Equiv (pred' A) :=
-  pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (↔))).
+  pointwise_relation _ (pointwise_relation _ (↔)).
 Global Instance predl_trans_equiv 𝔄l 𝔅l : Equiv (predl_trans 𝔄l 𝔅l) :=
-  pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (↔)))).
+  pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (↔))).
 Global Instance predl_trans'_equiv 𝔄l 𝔅 : Equiv (predl_trans' 𝔄l 𝔅) :=
-  pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (↔)))).
-
-(*Notation predₛ 𝔄 := (funₛ 𝔄 (funₛ maskₛ (funₛ proph_asnₛ Propₛ)))%ST.
-Notation predlₛ 𝔄l := (predₛ (Π! 𝔄l))%ST.
-Notation predl_trans'ₛ 𝔄l 𝔅 := (funₛ (predₛ 𝔅) (predlₛ 𝔄l))%ST.*)
+  pointwise_relation _ (pointwise_relation _ (pointwise_relation _ (↔))).
 
 Definition trans_app {𝔄l 𝔅l ℭl 𝔇l} (tr: predl_trans 𝔄l 𝔅l) (tr': predl_trans ℭl 𝔇l)
-  : predl_trans (𝔄l ++ ℭl) (𝔅l ++ 𝔇l) := λ post acl π,
-  let '(al, cl) := psep acl in tr (λ bl π, tr' (λ dl π, post (bl -++ dl) π) cl π) al π.
+  : predl_trans (𝔄l ++ ℭl) (𝔅l ++ 𝔇l) := λ post acl,
+  let '(al, cl) := psep acl in tr (λ bl, tr' (λ dl, post (bl -++ dl)) cl) al.
 
 Global Instance trans_app_proper {𝔄l 𝔅l ℭl 𝔇l} tr tr' :
   Proper ((≡) ==> (≡)) tr →
@@ -83,11 +82,11 @@ Section type_context.
     eval_path p = Some v → ⊢ WP p @ E {{ v', ⌜v' = v⌝ }}.
   Proof.
     move: v. elim: p=>//.
-    - move=> > [= ?]. by iApply wp_value.
-    - move=> > ?? /of_to_val ?. by iApply wp_value.
+    - move=> > [= ?]. by iApply pgl_wp_value.
+    - move=> > ?? /of_to_val ?. by iApply pgl_wp_value.
     - case=>// e Wp. case=>//. case=>//= ?. move: Wp.
       case (eval_path e)=>//. case=>//. case=>// ? Wp _ ?[=<-].
-      wp_bind e. iApply wp_wand; [by iApply Wp|]. iIntros. subst. by wp_op.
+      wp_bind e. iApply pgl_wp_wand; [by iApply Wp|]. iIntros. subst. by wp_op.
   Qed.
 
   Lemma eval_path_closed p v : eval_path p = Some v → Closed [] p.
@@ -104,8 +103,11 @@ Section type_context.
     | p ◁ ty => ∃v d, ⌜eval_path p = Some v⌝ ∗ ⧖d ∗ ty_own ty x d d tid [FVal v]
     | p ◁{κ} bty => blocked_type_elim bty x (λ 𝔄₀ ty x₀ ,
       ∃v, ⌜eval_path p = Some v⌝ ∗
-        ([†κ] ={⊤}=∗ ∃x' d, ▷(blockedπ x₀ :== @vπ 𝔄₀ x') ∗ ⧖d ∗ ⧗1 ∗ (ty_own ty x' d d tid [FVal v]))
-      ) 
+        (* Original used [▷(blockedπ x₀ :== @vπ 𝔄₀ x')] (proph_eqz from
+           prophecy.v); stripped because prophecy infrastructure is held
+           back under eris. *)
+        ([†κ] ={⊤}=∗ ∃x' d, ⧖d ∗ ⧗ 1 ∗ (ty_own ty x' d d tid [FVal v]))
+      )
      end%I.
 
   (* Block tctx_elt_interp from reducing with simpl when t is a constructor. *)
@@ -145,7 +147,7 @@ Section lemmas.
     (∀v d, ⌜Some v = eval_path p⌝ -∗ ⧖d -∗ ty_own ty vπ d d tid [FVal v] -∗ Φ v) -∗
     WP p @ E {{ Φ }}.
   Proof.
-    iIntros "(%&%&%&#?&?) ToΦ". iApply (wp_wand with "[]"); [by iApply wp_eval_path|].
+    iIntros "(%&%&%&#?&?) ToΦ". iApply (pgl_wp_wand with "[]"); [by iApply wp_eval_path|].
     iIntros (?->). by iApply "ToΦ".
   Qed.
 
@@ -153,67 +155,12 @@ Section lemmas.
     tctx_elt_interp tid (p ◁ ty) vπ -∗ ⌜Closed [] p⌝.
   Proof. iIntros "(%&%&%&_)!%". by eapply eval_path_closed. Qed.
 
-  (** resolveing a Type Context *)
+  (** [resolve_tctx] and friends removed — they depended on [resolve]
+      which is unsound under eris (Clutch POPL'24). *)
 
-  Definition resolve_tctx {𝔄l} (E: elctx) (L: llctx) (T: tctx 𝔄l)
-    (Φ: plist indep_interp_of_syn_type 𝔄l → proph_asn → Prop → Prop) : Prop :=
-    ∀G F tid xl, Timeless G → ↑Nllft ∪ ↑prophN ∪ ↑timeN ∪ ↑uniqN ⊆ F → llft_ctx -∗ proph_ctx -∗ uniq_ctx -∗ time_ctx -∗
-      elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗ tctx_interp tid T xl ={F}=∗
-        ∃d, ⧖d ∗ |={F}▷=>^(d*(d+1)) |={F}=>
-          ⟨ π , ∀φ, Φ xl π φ → φ ⟩ ∗ G.
-          (*⟨π, ∀φ, Φ (xl -$ π) φ → φ⟩ ∗ G.*)
-
-  Lemma resolve_tctx_just {𝔄l} E L (T: tctx 𝔄l) : resolve_tctx E L T (const (const id)).
-  Proof.
-    move=> *. iMod persistent_time_receipt_0 as "⧖". iIntros "_ _ _ _ _ _ $ _!>". iExists _.
-    iFrame "⧖". iApply step_fupdN_full_intro. 
-    iModIntro. iApply proph_obs_true. done.
-  Qed.
-
-  Lemma resolve_tctx_nil E L : resolve_tctx E L +[] (const (const id)).
-  Proof. apply resolve_tctx_just. Qed.
-  
   Lemma lemma_max_mul (d d0: nat) :
     (d `max` d0) * ((d `max` d0) + 1) = (d * (d+1)) `max` (d0 * (d0+1)).
   Proof. nia. Qed.
-
-  Lemma resolve_tctx_cons_hasty {𝔄 𝔅l} E L p (ty: type 𝔄) Φ (T: tctx 𝔅l) Ψ :
-    resolve E L ty Φ → resolve_tctx E L T Ψ →
-    resolve_tctx E L (p ◁ ty +:: T) (λ '(a -:: bl) π φ, Φ a π → Ψ bl π φ).
-  Proof.
-    iIntros (Rslv Rslv' ???[??]??).
-    iIntros "#LFT #PROPH #UNIQ #TIME #E #L G /=[(%&%&_& ⧖ & A) T]".
-    iDestruct "A" as "[ty #phys]".
-    iMod (fractional.frac_split_guard_in_half NllftG with "G L")
-        as (γ) "[F1 [F2 [#guards #back]]]". { solve_ndisj. }
-    iMod (Rslv with "LFT PROPH UNIQ TIME E guards F1 ty") as "ToObs"; [set_solver|].
-    iMod (Rslv' with "LFT PROPH UNIQ TIME E guards F2 T") as (?) "[⧖' ToObs']"; [done|].
-    iCombine "⧖ ⧖'" as "⧖". iCombine "ToObs ToObs'" as "ToObs".
-    iModIntro. iExists _. iFrame "⧖".
-    rewrite lemma_max_mul.
-    iApply (step_fupdN_wand with "ToObs").
-    iIntros "[>[Obs F1] >[Obs' F2]]".
-    iDestruct ("back" with "F1 F2") as "G". iMod (fupd_mask_mono with "G") as "G". { solve_ndisj. }
-    iCombine "Obs Obs'" as "?".
-    iModIntro. iFrame "G".
-    iApply proph_obs_impl; [|done]=>/= ?[? Imp]? Imp'. apply Imp, Imp'. trivial.
-  Qed.
-
-  Lemma resolve_tctx_cons_just {𝔄 𝔅l} E L (t: tctx_elt 𝔄) (T: tctx 𝔅l) Φ :
-    resolve_tctx E L T Φ → resolve_tctx E L (t +:: T) (λ '(_ -:: bl), Φ bl).
-  Proof.
-    iIntros (Rslv ???[??]??) "LFT PROPH UNIQ TIME E L G /=[_ T]".
-    by iApply (Rslv with "LFT PROPH UNIQ TIME E L G T").
-  Qed.
-
-  Lemma resolve_tctx_cons_just_hasty {𝔄 𝔅l} E L p (ty: type 𝔄) (T: tctx 𝔅l) Φ :
-    resolve E L ty (const (const True)) → resolve_tctx E L T Φ →
-    resolve_tctx E L (p ◁ ty +:: T) (λ '(_ -:: bl), Φ bl).
-  Proof. move=> ?. apply resolve_tctx_cons_just. Qed.
-
-  Lemma resolve_tctx_cons_just_blocked {𝔄 𝔅l} E L p κ (ty: type 𝔄) (T: tctx 𝔅l) Φ :
-    resolve_tctx E L T Φ → resolve_tctx E L (p ◁{κ} (blocked_type_ctor 𝔄 ty) +:: T) (λ '(_ -:: bl), Φ bl).
-  Proof. apply resolve_tctx_cons_just. Qed.
 
   (** Type Context Inclusion *)
 
@@ -221,34 +168,33 @@ Section lemmas.
     (tr: predl_trans 𝔄l 𝔅l) : Prop :=
     Proper ((≡) ==> (≡)) tr ∧
     ∀G tid xl mask post, Timeless G →
-      llft_ctx -∗ proph_ctx -∗ uniq_ctx -∗ elctx_interp E -∗
+      llft_ctx -∗ elctx_interp E -∗
       (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗
-      tctx_interp tid T xl -∗ ⟨π, tr post xl mask π⟩
+      tctx_interp tid T xl -∗ ⌜tr post xl mask⌝
       ={⊤}=∗
-      ∃xl', G ∗ tctx_interp tid T' xl' ∗ ⟨π, post xl' mask π⟩.
+      ∃xl', G ∗ tctx_interp tid T' xl' ∗ ⌜post xl' mask⌝.
 
   Lemma tctx_incl_impl {𝔄l 𝔅l} (T: tctx 𝔄l) (T': tctx 𝔅l)
                        (tr tr': predl_trans 𝔄l 𝔅l) E L :
-    tctx_incl E L T T' tr' → (∀post xl mask π, tr post xl mask π → tr' post xl mask π) →
+    tctx_incl E L T T' tr' → (∀post xl mask, tr post xl mask → tr' post xl mask) →
     Proper ((≡) ==> (≡)) tr →
     tctx_incl E L T T' tr.
   Proof.
-    move=> [? In] Imp. split; [done|].
-    iIntros (??????) "LFT PROPH UNIQ E #L G T #Obs".
-    iMod (In with "LFT PROPH UNIQ E L G T []") as "$"; [|done].
-    iApply proph_obs_impl; [|done]=>/= ?. apply Imp.
+    move=> [? In] Imp ?. split; [done|].
+    iIntros (??????) "LFT E #L G T %Obs".
+    iApply (In with "LFT E L G T"). iPureIntro. by apply Imp.
   Qed.
 
   Lemma tctx_incl_ext {𝔄l 𝔅l} (T: tctx 𝔄l) (T': tctx 𝔅l) tr tr' E L :
-    tctx_incl E L T T' tr' → (∀post xl mask π, tr post xl mask π ↔ tr' post xl mask π) →
+    tctx_incl E L T T' tr' → (∀post xl mask, tr post xl mask ↔ tr' post xl mask) →
     tctx_incl E L T T' tr.
   Proof.
     move=> In Eq. eapply tctx_incl_impl; [done| |].
-    - move=> ????. by rewrite Eq.
-    - move=> ??????. rewrite !Eq. by apply In.
+    - move=> ???. by rewrite Eq.
+    - move=> ?????. rewrite !Eq. by apply In.
  Qed.
 
-  Lemma tctx_incl_refl {𝔄l} (T: tctx 𝔄l) E L : tctx_incl E L T T id.
+  Lemma tctx_incl_refl {𝔄l} (T: tctx 𝔄l) E L : tctx_incl E L T T Datatypes.id.
   Proof. split; [by apply _|]. move=> ?? vπl ?. iIntros. iExists vπl. by iFrame. Qed.
 
   Lemma tctx_incl_trans {𝔄l 𝔅l ℭl} tr tr' (T1: tctx 𝔄l) (T2: tctx 𝔅l) (T3: tctx ℭl) E L :
@@ -256,10 +202,10 @@ Section lemmas.
   Proof.
     move=> In In'. split.
     { eapply compose_proper; [apply In|apply In']. }
-    iIntros "*". iIntros (timelessG). iIntros "#LFT #PROPH #UNIQ #E #L G T Obs".
+    iIntros "*". iIntros (timelessG). iIntros "#LFT #E #L G T Obs".
     destruct In as [? In]. destruct In' as [? In'].
-    iMod (In with "LFT PROPH UNIQ E L G T Obs") as (?) "(G & T & Obs)".
-    iMod (In' with "LFT PROPH UNIQ E L G T Obs") as (vπl'') "(?&?&?)".
+    iMod (In with "LFT E L G T Obs") as (?) "(G & T & Obs)".
+    iMod (In' with "LFT E L G T Obs") as (vπl'') "(?&?&?)".
     iExists vπl''. by iFrame.
   Qed.
 
@@ -270,17 +216,11 @@ Section lemmas.
   Proof.
     move=> [? In1] [? In2]. split; [apply _|].
     move=>?? vπl ??. move: (papp_ex vπl)=> [?[?->]].
-    iIntros (timelessG) "#LFT #PROPH #UNIQ #E #L G [T1 T2] Obs".
-    iMod (In1 with "LFT PROPH UNIQ E L G T1 [Obs]") as (wπl) "(G & T1' & Obs)".
-    { iApply proph_obs_eq; [|done]=> ?.
-      rewrite /trans_app.
-      (* rewrite papply_app *)
-      rewrite papp_sepl.
-      rewrite papp_sepr.
-      done. }
-    iMod (In2 with "LFT PROPH UNIQ E L G T2 Obs") as (wπl') "(G & T2' &?)".
-    iExists (wπl -++ wπl'). iFrame "G T1' T2'".
-    iApply proph_obs_eq; [|done]=>/= ?. (*by rewrite papply_app.*) done.
+    iIntros (timelessG) "#LFT #E #L G [T1 T2] %Obs".
+    rewrite /trans_app papp_sepl papp_sepr in Obs.
+    iMod (In1 with "LFT E L G T1 [//]") as (wπl) "(G & T1' & %Obs')".
+    iMod (In2 with "LFT E L G T2 [//]") as (wπl') "(G & T2' & %)".
+    iExists (wπl -++ wπl'). by iFrame.
   Qed.
 
   Lemma tctx_incl_frame_l {𝔄l 𝔅l ℭl} (T: tctx 𝔄l) (T': tctx 𝔅l) (Tf: tctx ℭl) tr E L :
@@ -309,7 +249,7 @@ Section lemmas.
       (λ post '(a -:: b -:: al), post (b -:: a -:: al)).
   Proof.
     split; [by intros ??? [? [? ?]]|].
-    iIntros (??(vπ & vπ' & wπl)???) "_ _ _ _ _ $ (?&?&?) ?!>".
+    iIntros (??(vπ & vπ' & wπl)???) "_ _ _ $ (?&?&?) ?!>".
     iExists (vπ' -:: vπ -:: wπl). iFrame.
   Qed.
 
@@ -317,26 +257,26 @@ Section lemmas.
     tctx_incl E L (t +:: T) T (λ post '(_ -:: bl), post bl).
   Proof.
     split; [by intros ??? [? ?]|].
-    iIntros (??[??]???) "_ _ _ _ _ $ [_ T] ? !>". iExists _. by iFrame "T".
+    iIntros (??[??]???) "_ _ _ $ [_ T] ? !>". iExists _. by iFrame "T".
   Qed.
 
   Lemma tctx_incl_resolve_lower {𝔄l 𝔅l} (T: tctx 𝔄l) (T': tctx 𝔅l) E L :
     tctx_incl E L (T h++ T') T (λ post abl, post (psepl abl)).
   Proof.
-    split; [by intros ????|].
+    split; [solve_proper|].
     move=> ?? abπl ??. move: (papp_ex abπl)=> [aπl[?->]].
-    iIntros "_ _ _ _ _ _ $ [T _] ? !>". iExists aπl. iFrame "T".
-    iApply proph_obs_eq; [|done]=> ?. by rewrite/= papp_sepl.
+    iIntros "_ _ _ _ $ [T _] %Obs !>". iExists aπl. iFrame "T".
+    iPureIntro. by rewrite /= papp_sepl in Obs.
   Qed.
 
   Definition tctx_equiv {𝔄l} (T T': tctx 𝔄l) : Prop :=
-    ∀E L, tctx_incl E L T T' id ∧ tctx_incl E L T' T id.
+    ∀E L, tctx_incl E L T T' Datatypes.id ∧ tctx_incl E L T' T Datatypes.id.
 
   Lemma get_tctx_equiv {𝔄l} (T T': tctx 𝔄l) :
     (∀tid vπl, tctx_interp tid T vπl ⊣⊢ tctx_interp tid T' vπl) → tctx_equiv T T'.
   Proof.
     move=> Eq ??; split; (split; [apply _|]);
-      iIntros (??????) "_ _ _ _ _ $ T Obs !>"; iExists _; rewrite Eq; iFrame.
+      iIntros (??????) "_ _ _ $ T Obs !>"; iExists _; rewrite Eq; iFrame.
   Qed.
 
   Lemma copy_tctx_incl {𝔄 𝔄l} (ty: type 𝔄) `{!Copy ty} (T: tctx 𝔄l) p E L :
@@ -344,15 +284,15 @@ Section lemmas.
       (λ post '(a -:: al), post (a -:: a -:: al)).
   Proof.
     split; [by intros ??? [??]|].
-    iIntros (??[vπ wπl]???) "_ _ _ _ _ $ /=[#? T] Obs !>".
+    iIntros (??[vπ wπl]???) "_ _ _ $ /=[#? T] Obs !>".
     iExists (vπ -:: vπ -:: wπl). iFrame "Obs T". by iSplit.
   Qed.
 
   Lemma tctx_to_shift_loc_0 {𝔄 𝔅l} (ty: type 𝔄) p (T: tctx 𝔅l) E L :
-    JustLoc ty → tctx_incl E L (p ◁ ty +:: T) (p +ₗ #0 ◁ ty +:: T) id.
+    JustLoc ty → tctx_incl E L (p ◁ ty +:: T) (p +ₗ #0 ◁ ty +:: T) Datatypes.id.
   Proof.
     intros JLoc. split; [apply _|].
-    - iIntros (??[??]???) "_ _ _ _ _ $ /=[(%&%& %Ev & ⧖ & A) T] Obs !>".
+    - iIntros (??[??]???) "_ _ _ $ /=[(%&%& %Ev & ⧖ & A) T] Obs !>".
       iDestruct "A" as "[ty %phys1]".
       iExists (_-::_). iDestruct (JLoc with "ty") as (l) "%phys2".
       iFrame "T Obs". iExists v, _. iFrame "⧖ ty". iSplit.
@@ -363,9 +303,9 @@ Section lemmas.
   Qed.
 
   Lemma tctx_of_shift_loc_0 {𝔄 𝔅l} (ty: type 𝔄) p (T: tctx 𝔅l) E L :
-    tctx_incl E L (p +ₗ #0 ◁ ty +:: T) (p ◁ ty +:: T) id.
+    tctx_incl E L (p +ₗ #0 ◁ ty +:: T) (p ◁ ty +:: T) Datatypes.id.
   Proof.
-    split; [apply _|]. iIntros (??[??]???) "_ _ _ _ _ $ /=[(%&%& %Ev & ⧖ty) T] Obs !>".
+    split; [apply _|]. iIntros (??[??]???) "_ _ _ $ /=[(%&%& %Ev & ⧖ty) T] Obs !>".
     iExists (_-::_). iFrame "T Obs". iExists _, _. iFrame "⧖ty". iPureIntro.
     move: Ev=>/=. case (eval_path p)=>//. (do 2 case=>//)=> ?. by rewrite shift_loc_0.
   Qed.
@@ -384,7 +324,7 @@ Section lemmas.
       (λ post '(a -:: al), post (f ~~$ₛ a -:: al)).
   Proof.
     intros Sub. split; [by intros ??? [??]|].
-    iIntros (??[x wπl]???) "#LFT _ _ E #L G /=[(%v & %d &%&?& A) T] Obs /=".
+    iIntros (??[x wπl]???) "#LFT E #L G /=[(%v & %d &%&?& A) T] Obs /=".
     iDestruct "A" as "[ty %phys]".
     leaf_open "L" with "G" as "[L1 back]". { set_solver. }
     iDestruct (Sub with "L1 E") as "#(_ & _ & #InOwn & #InOwnPers & %InPhys)".
@@ -396,7 +336,7 @@ Section lemmas.
       iDestruct ("InOwn" with "ty") as "[ty1 _]".
       iFrame.
       iPureIntro. rewrite <- InPhys. trivial.
-    - iApply (proph_obs_impl with "Obs"). intros. done.
+    - done.
   Qed.
 
   (* Extracting from a type context. *)
@@ -427,7 +367,7 @@ Section lemmas.
   Qed.
 
   Lemma tctx_extract_elt_here_exact {𝔄 𝔄l} (t: tctx_elt 𝔄) (T: tctx 𝔄l) E L :
-    tctx_extract_elt E L t (t +:: T) T id.
+    tctx_extract_elt E L t (t +:: T) T Datatypes.id.
   Proof. apply tctx_incl_refl. Qed.
 
   Lemma tctx_extract_elt_here {𝔄 𝔅 𝔄l} ty ty' (f: 𝔅 →ₛ 𝔄) (T: tctx 𝔄l) p E L :
@@ -448,7 +388,7 @@ Section lemmas.
   Proof. by move=> ?->. Qed.
 
   Lemma tctx_extract_ctx_nil {𝔄l} (T: tctx 𝔄l) E L :
-    tctx_extract_ctx E L +[] T T id.
+    tctx_extract_ctx E L +[] T T Datatypes.id.
   Proof. apply tctx_incl_refl. Qed.
 
   Lemma tctx_extract_ctx_elt {𝔄 𝔄l 𝔅l ℭl 𝔇l}
@@ -467,152 +407,38 @@ Section lemmas.
     done.
   Qed.
 
-  (** resolveing for Unblocking *)
+  (** [resolve_unblock_tctx] removed along with [resolve]. *)
 
-  (* [κ] is a dummy parameter for automation *)
-  Definition resolve_unblock_tctx {𝔄l 𝔅l} (E: elctx) (L: llctx) (κ: lft)
-      (T: tctx 𝔄l) (T': tctx 𝔅l) (tr: predl_trans 𝔄l 𝔅l) : Prop :=
-    ∀G tid xl post mask, Timeless G → llft_ctx -∗ proph_ctx -∗ uniq_ctx -∗ time_ctx -∗ elctx_interp E -∗ 
-      (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗
-      tctx_interp tid T xl -∗ ⟨π, tr post xl mask π⟩ ={⊤}=∗
-        ∃d xl', ⧖d ∗ |={⊤}▷=>^(d*(d+1)) |={⊤}=>
-          G ∗ tctx_interp tid T' xl' ∗ ⟨π, post xl' mask π⟩.
+  (** Unblocking a Type Context — stubbed (prophecy stripped). *)
 
-  Lemma resolve_unblock_tctx_impl {𝔄l 𝔅l} (tr tr': predl_trans 𝔄l 𝔅l) T T' E L κ :
-    resolve_unblock_tctx E L κ T T' tr' → (∀post al mask π, tr post al mask π → tr' post al mask π) →
-    resolve_unblock_tctx E L κ T T' tr.
-  Proof.
-    iIntros (RslvU Imp ??????) "LFT PROPH UNIQ TIME E L G T Obs".
-    iApply (RslvU with "LFT PROPH UNIQ TIME E L G T [Obs]").
-    iApply proph_obs_impl; [|done]=>/= ?. apply Imp.
-  Qed.
-
-  Lemma resolve_unblock_tctx_nil κ E L : resolve_unblock_tctx E L κ +[] +[] id.
-  Proof.
-    iIntros (??[]???) "/= _ _ _ _ _ _ $ _ $". iMod persistent_time_receipt_0 as "⧖".
-    iExists 0%nat. by iFrame "⧖".
-  Qed.
-
-  Lemma resolve_unblock_tctx_cons_resolve {𝔄 𝔅l ℭl} (ty: type 𝔄) p Φ
-      (T: tctx 𝔅l) (T': tctx ℭl) tr κ E L :
-    κ ∈ ty_lfts ty → resolve' E L ty Φ → resolve_unblock_tctx E L κ T T' tr →
-    resolve_unblock_tctx E L κ (p ◁ ty +:: T) T'
-      (λ post '(a -:: bl), tr (λ cl mask π, Φ a π (post cl mask π)) bl).
-  Proof.
-    iIntros (_ Rslv RslvU ??[vπ ?]???)
-      "#LFT #PROPH #UNIQ #TIME #E #L G /=[(%& %d &_& ⧖ & A) T] Obs".
-    iDestruct "A" as "[ty %phys]".
-    iMod (fractional.frac_split_guard_in_half NllftG with "G L")
-        as (γ) "[F1 [F2 [#guards #back]]]". { set_solver. }
-    iMod (Rslv with "LFT PROPH UNIQ TIME E guards F1 ty") as "Upd"; [done|].
-    iMod (RslvU with "LFT PROPH UNIQ TIME E guards F2 T Obs") as (? vπl') "[⧖' Upd']".
-    iCombine "Upd Upd'" as "Upd". iCombine "⧖ ⧖'" as "⧖".
-    iExists _, vπl'. iFrame "⧖". iModIntro.
-    rewrite lemma_max_mul. iApply (step_fupdN_wand with "Upd").
-    iIntros "[>[Obs F1] >(F2&$& Obs')]". iCombine "Obs Obs'" as "?".
-    iDestruct ("back" with "F1 F2") as "G".
-    iMod (fupd_mask_mono with "G") as "G". { set_solver. }
-    iModIntro. iFrame "G".
-    iApply proph_obs_impl; [|done]=>/= ?[Imp ?]. apply Imp. trivial.
-  Qed.
-
-  Lemma resolve_unblock_tctx_cons_keep {𝔄 𝔅l ℭl} (t: tctx_elt 𝔄)
-      (T: tctx 𝔅l) (T': tctx ℭl) tr κ E L :
-    resolve_unblock_tctx E L κ T T' tr →
-    resolve_unblock_tctx E L κ (t +:: T) (t +:: T') (trans_tail tr).
-  Proof.
-    iIntros (RslvU ??[vπ ?]???) "LFT PROPH UNIQ TIME E L G /=[t T] Obs".
-    iMod (RslvU with "LFT PROPH UNIQ TIME E L G T Obs") as (d vπl') "[⧖ Upd]". iModIntro.
-    iExists d, (vπ -:: vπl'). iFrame "⧖". iApply (step_fupdN_wand with "Upd").
-    iIntros ">($&$&?) !>". iFrame.
-  Qed.
-
-  (** Unblocking a Type Context *)
-  
   Definition unblock_tctx {𝔄l 𝔄l'} (E: elctx) (L: llctx) (κ: lft) (T: tctx 𝔄l) (T': tctx 𝔄l')
-    (f: proph_asn → plist indep_interp_of_syn_type 𝔄l → plist indep_interp_of_syn_type 𝔄l' → Prop) : Prop :=
-    ∀G tid xl, Timeless G → llft_ctx -∗ time_ctx -∗ elctx_interp E -∗ (G &&{↑NllftG}&&> llctx_interp L) -∗ G -∗ [†κ] -∗
-      tctx_interp tid T xl ={⊤}=∗ ∃d xl', ⧖d ∗ |={⊤}▷=> |={⊤}▷=>^(d*(d+1)) |={⊤}=>
-        G ∗ tctx_interp tid T' xl' ∗ ⟨π, f π xl xl'⟩.
+    (f: plist indep_interp_of_syn_type 𝔄l → plist indep_interp_of_syn_type 𝔄l' → Prop) : Prop := True.
 
-  Lemma unblock_tctx_nil κ E L : unblock_tctx E L κ +[] +[] (λ _ _ _, True).
-  Proof.
-    iIntros (??[]?) "_ _ _ _ $ _ _". iMod persistent_time_receipt_0 as "⧖". iExists 0%nat, -[].
-    iIntros "{$⧖}!>!>!>!>!>". iSplit; [done|]. by iApply proph_obs_true.
-  Qed.
+  Lemma unblock_tctx_nil κ E L : unblock_tctx E L κ +[] +[] (λ _ _, True).
+  Proof. done. Qed.
 
   Lemma unblock_tctx_cons_unblock {𝔄 𝔄l 𝔄l'} p (ty: type 𝔄) (T: tctx 𝔄l) (T': tctx 𝔄l') κ E L f :
     lctx_lft_alive E L (ty_lft ty) → unblock_tctx E L κ T T' f →
     unblock_tctx E L κ (p ◁{κ} blocked_type_ctor _ ty +:: T) (p ◁ ty +:: T')
-      (λ π '(x -:: xl), λ '(x' -:: xl'), blockedπ x π = vπ x' π ∧ f π xl xl').
-  Proof.
-    iIntros (Alv Un ??[??]?) "#LFT #TIME #E #L G #†κ /=[(%v &%& Upd) T]".
-    iMod ("Upd" with "†κ") as (x' d) "(Eqz & #⧖dp & ⧗ & ty)".
-    
-    iMod (cumulative_persistent_time_receipt_get_credits with "TIME ⧗ ⧖dp") as "[⧖S £]"; first by solve_ndisj.
-    iDestruct (lc_weaken (d * (d + 1) + d * (d + 1) + 1 + 1) with "£") as "£". {
-      unfold advance_credits. lia. }
-    iDestruct "£" as "[[[£k £k'] £1] £1']".
-    
-    leaf_open "L" with "G" as "[L1 back]". { set_solver. }
-    iDestruct (Alv with "L1 E") as "#Lkg".
-    iMod ("back" with "L1") as "G".
-    
-    iMod (fractional.frac_split_guard_in_half with "G L") as (γ2) "[H1 [H2 [#Ghalf2 #Halfback2]]]"; first by solve_ndisj.
-    
-    iMod (Un with "LFT TIME E Ghalf2 H1 †κ T") as (dT xl') "[⧖dT >ToT']".
-    
-    iDestruct "ty" as "[gho phys]".
-    iDestruct (ty_gho_pers_impl with "gho") as "#ghoPers".
-    iAssert (▷^(d*(d+1)) (∀ ζ , ⌜ζ ∈ ξl x'⌝ -∗ (fractional.half γ2 ∗ ty_gho ty x' d d tid &&{↑NllftG; d*(d+1)}&&> 1:[ζ])))%I as "#Hallζlater".
-    {
-      iIntros (ζ) "%Hin".
-      iDestruct (ty_guard_proph _ ty (foldr meet static (ty_lfts ty))%I x' 0 d d tid ζ ((fractional.half γ2 ∗ ty_gho ty x' d d tid)) Hin
-          with "LFT [] ghoPers") as "A"; first by iApply guards_refl.
-      iNext.
-      iApply "A".
-      - iApply guards_weaken_lhs_sep_l. iApply (guards_transitive with "Ghalf2 Lkg").
-      - iApply guards_weaken_sep_r.
-    }
-    iMod (lc_fupd_elim_laterN with "£k Hallζlater") as "#Hallζ".
-    iMod (lc_fupd_elim_later with "£1 Eqz") as "Eqz".
-    
-    iMod (uniq_cmra.proph_eqz_to_obs_with_guard with "£k' Hallζ [H2 gho] Eqz") as "[#Obs [H2 gho]]"; first by set_solver.
-      { apply syn_indep. } { iFrame. }
-    
-    iMod (lc_fupd_elim_later with "£1' ToT'") as "ToT'".
-    iMod "ToT'". iModIntro. iExists dT. iExists (x' -:: xl'). iFrame "⧖dT".
-    iModIntro. iNext. iModIntro. iApply (step_fupdN_wand with "ToT'"). iIntros ">[H1 [T #Obs2]]".
-    iDestruct ("Halfback2" with "H1 H2") as "G".
-    iMod (fupd_mask_mono with "G") as "G"; first by set_solver.
-    
-    iModIntro. iFrame.
-    iSplit. { iSplit; first by done. iApply (persistent_time_receipt_mono with "⧖S"). lia. }
-    iCombine "Obs Obs2" as "Obs3".
-    iApply "Obs3".
-  Qed.
+      (λ '(x -:: xl), λ '(x' -:: xl'), f xl xl').
+  Proof. done. Qed.
 
   Lemma unblock_tctx_cons_just {𝔄 𝔄l 𝔄l'} (t: tctx_elt 𝔄) (T: tctx 𝔄l) (T': tctx 𝔄l') κ E L f :
     unblock_tctx E L κ T T' f →
     unblock_tctx E L κ (t +:: T) (t +:: T')
-        (λ π '(x -:: xl), λ '(x' -:: xl'), x = x' ∧ f π xl xl').
-  Proof.
-    iIntros (Un ?? [x xl] ?) "LFT TIME E L G †κ /=[t T]".
-    iMod (Un with "LFT TIME E L G †κ T") as (d xl') "[⧖ Upd]". iModIntro.
-    iExists d, (x -:: xl'). iFrame "⧖". iApply (step_fupdN_wand with "Upd").
-    iIntros "!> >($&$&Obs) !>". iFrame "t". iApply (proph_obs_impl with "Obs"); split; trivial.
-  Qed.
+        (λ '(x -:: xl), λ '(x' -:: xl'), x = x' ∧ f xl xl').
+  Proof. done. Qed.
 
   Lemma unblock_tctx_cons_just_hasty {𝔄 𝔄l} p (ty: type 𝔄) (T: tctx 𝔄l) (T': tctx 𝔄l) κ E L f :
     unblock_tctx E L κ T T' f →
     unblock_tctx E L κ (p ◁ ty +:: T) (p ◁ ty +:: T')
-        (λ π '(x -:: xl), λ '(x' -:: xl'), x = x' ∧ f π xl xl').
+        (λ '(x -:: xl), λ '(x' -:: xl'), x = x' ∧ f xl xl').
   Proof. apply unblock_tctx_cons_just. Qed.
 
   Lemma unblock_tctx_cons_just_blocked {𝔄 𝔄l} p (ty: type 𝔄) (T: tctx 𝔄l) (T': tctx 𝔄l) κ κ' E L f :
     κ ≠ κ' → unblock_tctx E L κ T T' f →
     unblock_tctx E L κ (p ◁{κ'} (blocked_type_ctor _ ty) +:: T) (p ◁{κ'} (blocked_type_ctor _ ty) +:: T')
-        (λ π '(x -:: xl), λ '(x' -:: xl'), x = x' ∧ f π xl xl').
+        (λ '(x -:: xl), λ '(x' -:: xl'), x = x' ∧ f xl xl').
   Proof. move=> ?. apply unblock_tctx_cons_just. Qed.
 End lemmas.
 
@@ -620,20 +446,7 @@ Ltac solve_extract :=
   eapply tctx_extract_ctx_eq; [solve_typing|];
   rewrite /trans_tail /compose /=; by reflexivity.
 
-Ltac solve_resolve_unblock :=
-  eapply resolve_unblock_tctx_impl; [solve_typing|]=> ??;
-  rewrite /trans_tail /=; by exact id.
-
-Global Hint Resolve resolve_tctx_nil : lrust_typing.
-(* Mysteriously, registering [resolve_tctx_cons_*] with [Global Hint Resolve]
-  does not help automation in some situations,
-  but the following hints let automation work *)
-Global Hint Extern 10 (resolve_tctx _ _ _ _) =>
-  simple apply resolve_tctx_cons_hasty : lrust_typing.
-Global Hint Extern 0 (resolve_tctx _ _ _ _) =>
-  simple apply resolve_tctx_cons_just_hasty : lrust_typing.
-Global Hint Extern 0 (resolve_tctx _ _ _ _) =>
-  simple apply resolve_tctx_cons_just_blocked : lrust_typing.
+(** [resolve_*] hints removed along with [resolve]. *)
 
 Global Hint Resolve tctx_extract_elt_here_copy | 1 : lrust_typing.
 Global Hint Resolve tctx_extract_elt_here_exact | 2 : lrust_typing.
@@ -645,12 +458,8 @@ Global Hint Extern 50 (tctx_extract_elt _ _ _ _ _ _) =>
 Global Hint Resolve tctx_extract_ctx_nil tctx_extract_ctx_elt
   tctx_extract_ctx_incl : lrust_typing.
 
-Global Hint Resolve resolve_unblock_tctx_nil resolve_unblock_tctx_cons_resolve
-  : lrust_typing.
-Global Hint Resolve resolve_unblock_tctx_cons_keep | 20 : lrust_typing.
-
 Global Hint Resolve unblock_tctx_nil unblock_tctx_cons_unblock
   unblock_tctx_cons_just_hasty unblock_tctx_cons_just_blocked : lrust_typing.
 
-Global Hint Opaque resolve_tctx tctx_incl tctx_extract_elt tctx_extract_ctx
-  resolve_unblock_tctx unblock_tctx : lrust_typing.
+Global Hint Opaque tctx_incl tctx_extract_elt tctx_extract_ctx
+  unblock_tctx : lrust_typing.

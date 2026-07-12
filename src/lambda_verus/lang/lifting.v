@@ -1,319 +1,571 @@
+(** Lifting lemmas for [lrust_prob_lang]'s eris-based WP.
+
+    Defines the [lrustGS] resource bundle, plumbs it as the canonical
+    [erisWpGS] instance with [state_interp σ := heap_ctx σ], and
+    derives the heap and pure WP rules over [pgl_wp]. *)
 Require Import guarding.internal.na_invariants_fork.
-From guarding Require Import guard.
+From Stdlib Require Import Reals Psatz.
 From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Export weakestpre.
-From iris.program_logic Require Import ectx_lifting.
-From lrust.lang Require Export lang heap time.
-From lrust.lang Require Import tactics.
+From iris.base_logic.lib Require Export fancy_updates.
+From clutch.eris Require Export weakestpre.
+From clutch.eris Require Import ectx_lifting lifting.
+From clutch.base_logic Require Export error_credits.
+From clutch.prob Require Import distribution.
+From lrust.lang Require Export lang time.
+From lrust.lang Require heap.   (* no Import: avoids iris WP notation clash *)
 From lrust.util Require Import update non_atomic_cell_map atomic_lock_counter.
+From guarding Require Import guard.
+From lrust.lifetime Require Import lifetime_full.
 Set Default Proof Using "Type".
 Import uPred.
 
 Open Scope Z_scope.
 
+(** [lrustGS] bundles the heap, lifetime/threadpool and atomic-lock-counter
+    ghost state, an invariant interface (HasLc — required for eris's
+    [fupd_finally]-based adequacy, iris MR 1217), eris's error-credit
+    ghost state, and the time-receipt ghost state.
+
+    [timeGS] gives access to the persistent and cumulative time-receipt
+    resources [⧖n] / [⧗n] used by the typing layer to pay for the
+    later-credit cascade in nested [ty_gho] / [ty_gho_pers] depths.
+    The actual *minting* of credits via [wp_persistent_time_receipt]
+    relies on [HasLc] later credits — see [time.v] for the time-step
+    invariant and the credit-extraction lemmas. *)
 Class lrustGS Σ := LRustGS {
-  lrustGS_invGS : invGS Σ;
+  lrustGS_invGS : invGS_gen HasLc Σ;
   #[global] lrustGS_na_invGS :: na_invG Σ;
   #[global] lrustGS_atomic_lock_ctr_invGS :: alc_logicG Σ;
-  #[global] lrustGS_gen_heapGS :: heapGS Σ;
-  #[global] lrustGS_gen_timeGS :: timeGS Σ
+  #[global] lrustGS_gen_heapGS :: heap.heapGS Σ;
+  #[global] lrustGS_ecGS :: ecGS Σ;
+  #[global] lrustGS_gen_timeGS :: timeGS Σ;
 }.
 
-Global Program Instance lrustGS_irisGS `{!lrustGS Σ} : irisGS lrust_lang Σ := {
-  iris_invGS := lrustGS_invGS;
-  state_interp σ stepcnt κs _ := (@heap_ctx Σ _ lrustGS_invGS lrustGS_na_invGS lrustGS_atomic_lock_ctr_invGS σ ∗ time_interp stepcnt)%I;
-  fork_post _ := True%I;
-  num_laters_per_step n := (sum_advance_credits (n + 1))%nat
+(** The plain [invGS] needed by [heap.v] is the same as [lrustGS_invGS]
+    (both are [invGS_gen HasLc Σ]). *)
+Global Instance lrustGS_invGS_inst `{!lrustGS Σ} : invGS Σ
+  := lrustGS_invGS.
+
+(** [state_interp n σ] bundles the heap with the per-step
+    [time_interp n] component.  The step index [n] is advanced by
+    the WP framework on each [prim_step] (eris-lc threads it
+    through [pgl_wp_pre]).  This is what lets
+    [wp_persistent_time_receipt_lc] open [time_ctx] under a step
+    and extract a fresh [⧖(d+1)] given an external [⧗1]. *)
+Global Program Instance lrustGS_erisWpGS `{!lrustGS Σ} :
+  erisWpGS lrust_prob_lang Σ := {
+  erisWpGS_invGS := lrustGS_invGS;
+  state_interp n σ := (heap.heap_ctx σ ∗ time_interp n)%I;
+  err_interp ε := ec_supply ε;
+  num_laters_per_step n := sum_advance_credits (n + 1);
 }.
 Next Obligation.
-  intros. iIntros "/= [$ H]". by iMod (time_interp_step with "H") as "$".
+  iIntros (Σ ? n σ) "[$ Ht]".
+  iMod (time_interp_step with "Ht") as "$". done.
 Qed.
 
-Global Opaque iris_invGS.
+Global Opaque lrustGS_invGS.
 
-Ltac inv_lit :=
-  repeat match goal with
-  | H : lit_eq _ ?x ?y |- _ => inversion H; clear H; simplify_map_eq/=
-  | H : lit_neq ?x ?y |- _ => inversion H; clear H; simplify_map_eq/=
-  end.
+(** * WP rules. *)
 
-Ltac inv_bin_op_eval :=
-  repeat match goal with
-  | H : bin_op_eval _ ?c _ _ _ |- _ => is_constructor c; inversion H; clear H; simplify_eq/=
-  end.
+Open Scope R.
 
-Local Hint Extern 0 (atomic _) => solve_atomic : core.
-Local Hint Extern 0 (base_reducible _ _) => eexists _, _, _, _; simpl : core.
+Section lifting.
+  Context `{!lrustGS Σ}.
 
-Local Hint Constructors head_step bin_op_eval lit_neq lit_eq : core.
-Local Hint Resolve alloc_fresh : core.
-Local Hint Resolve to_of_val : core.
+  (** [Rand]: uniform sampling over [0..N-1]. *)
+  Lemma wp_rand E (N : Z) (Φ : val → iProp Σ) s :
+    (0 < N)%Z →
+    (∀ (n : fin (S (Z.to_nat N - 1))),
+       Φ (LitV (LitInt (Z.of_nat (fin_to_nat n))))) -∗
+    WP Rand (Lit (LitInt N)) @ s; E {{ Φ }}.
+  Proof.
+    iIntros (HN) "HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]". iApply fupd_mask_intro; first set_solver.
+    iIntros "Hclose". iSplit.
+    { iPureIntro. rewrite /head_reducible /=.
+      rewrite bool_decide_eq_true_2 //.
+      eexists (_, _). apply dmap_pos. exists 0%fin. split; first done.
+      apply dunifP_pos. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= in Hstep.
+    rewrite bool_decide_eq_true_2 in Hstep; last done.
+    apply dmap_pos in Hstep as (n & [= -> ->] & _).
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hσ Ht". by iApply "HΦ".
+  Qed.
+  (** [Alloc]: fresh-block allocation. *)
+  Lemma wp_alloc E (n : Z) s :
+    (0 < n)%Z →
+    {{{ True }}} Alloc (Lit (LitInt n)) @ s; E
+    {{{ (l : loc) (sz : nat), RET LitV (LitLoc l);
+        ⌜n = sz⌝ ∗ heap.heap_freeable l 1 sz ∗
+        heap.heap_mapsto_vec l (repeat (LitV LitPoison) sz) }}}.
+  Proof.
+    iIntros (Hn Φ) "_ HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]".
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iSplit.
+    { iPureIntro. rewrite /head_reducible /=.
+      rewrite bool_decide_eq_true_2 //.
+      eexists (_, _). rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= in Hstep.
+    rewrite bool_decide_eq_true_2 in Hstep; last done.
+    apply dret_pos in Hstep as [= -> ->].
+    iMod (heap.heap_alloc with "Hσ") as "(Hσ & Hf & Hl)"; [exact Hn| |].
+    { intros m.
+      assert (fresh_loc σ1 +ₗ m = (fresh_block σ1, m)) as ->;
+        [rewrite /fresh_loc /shift_loc /=; f_equal; lia|].
+      apply is_fresh_block. }
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hσ Ht".
+    iApply ("HΦ" $! _ (Z.to_nat n)). iFrame. iPureIntro. lia.
+  Qed.
 
+  (** [Read] from a non-atomic cell at read-state 0. *)
+  Lemma wp_read E l v s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    {{{ ▷ heap.heap_mapsto l v }}} Read (Lit (LitLoc l)) @ s; E
+    {{{ RET v; heap.heap_mapsto l v }}}.
+  Proof.
+    iIntros (HE Φ) ">Hl HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
+    iMod (non_atomic_cell_map.points_to_heap_reading0 with "Hl Hh")
+      as "(Hl & Hh & %Hσl)"; [done|].
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iSplit.
+    { iPureIntro. rewrite /head_reducible /= Hσl /=.
+      eexists (_, _). rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= Hσl in Hstep.
+    apply dret_pos in Hstep as [= -> ->].
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iSplitL "Hh Hf ato Ht"; [iSplitR "Ht"; [iExists hF; by iFrame|by iFrame]|].
+    rewrite language.to_of_val /=. by iApply ("HΦ" with "Hl").
+  Qed.
+
+  (** [Write] to a non-atomic cell at read-state 0. *)
+  Lemma wp_write E l v v' s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    {{{ ▷ heap.heap_mapsto l v }}} Write (Lit (LitLoc l)) (of_val v') @ s; E
+    {{{ RET LitV LitPoison; heap.heap_mapsto l v' }}}.
+  Proof.
+    iIntros (HE Φ) ">Hl HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
+    iMod (non_atomic_cell_map.atomic_write _ _ _ v' with "Hl Hh")
+      as "(%Hσl & Hl & Hh)"; [done|].
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iSplit.
+    { iPureIntro. rewrite /head_reducible /=. rewrite to_of_val Hσl.
+      eexists (_, _). rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= to_of_val Hσl in Hstep.
+    apply dret_pos in Hstep as [= -> ->].
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iSplitL "Hh Hf ato Ht".
+    { iSplitR "Ht"; last by iFrame. iExists hF. iFrame.
+      iPureIntro. eauto using heap.heap_freeable_rel_stable. }
+    by iApply ("HΦ" with "Hl").
+  Qed.
+
+  (** [Read] through a leaf-guard:  given an abstract resource [G]
+      gated by a leaf-guard [G &&{↑NllftG; d}&&> ((l,c) #↦ v)], spend
+      [£d] later credits and consume [G] to read [v] from the cell.
+      [G] is returned unchanged.
+
+      Mirrors upstream verisbelt's [wp_read_na_guarded] (eris-port:
+      atomic instead of non-atomic, since we stripped concurrency).
+      Built on top of [heap.heap_read]. *)
+  (** Scalar (cell-level) form. *)
+  Lemma wp_read_guarded_cell E (l: loc) (cells: list cell_id) (w: val) (G: iProp Σ) d s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    {{{ (G &&{↑NllftG; d}&&> heap.heap_mapsto_cells_fancy l cells (heap.FVal w))
+        ∗ G ∗ £d }}}
+      Read (Lit (LitLoc l)) @ s; E
+    {{{ RET w; G }}}.
+  Proof.
+    iIntros (HE Φ) "(#Hguard & HG & H£) HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hh & Hf & %REL & ato)".
+    iMod (non_atomic_cell_map.atomic_read with "H£ Hguard HG Hh")
+      as (n) "(%Hσl & HG & Hh)"; [done|].
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iSplit.
+    { iPureIntro. rewrite /head_reducible /= Hσl /=.
+      eexists (_, _). rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= Hσl in Hstep.
+    apply dret_pos in Hstep as [= -> ->].
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iSplitL "Hh Hf ato Ht".
+    { iSplitR "Ht"; last by iFrame. iExists hF. by iFrame. }
+    rewrite language.to_of_val /=. by iApply ("HΦ" with "HG").
+  Qed.
+
+  (** Vector form (mirroring upstream's [wp_read_na_guarded_cells_singleton]):
+      takes the guard at the vec-form mapsto; case-splits on the cell-trace
+      list internally, deriving False for non-singleton traces. *)
+  Lemma wp_read_guarded_singleton E (l: loc) (c: list (list cell_id))
+                                  (w: val) (G: iProp Σ) d s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    {{{ (G &&{↑NllftG; d}&&> heap.heap_mapsto_cells_val_vec l c [w])
+        ∗ G ∗ £d }}}
+      Read (Lit (LitLoc l)) @ s; E
+    {{{ RET w; G }}}.
+  Proof.
+    iIntros (HE Φ) "(#Hguard & HG & H£) HΦ".
+    destruct c as [|c0 [|c1 c2]].
+    - (* c = [] : vec is False. *)
+      iApply fupd_pgl_wp.
+      iMod (guards_open_later _ _ E (↑NllftG) d with "Hguard HG")
+        as "Hop"; first solve_ndisj.
+      iMod (lc_fupd_elim_laterN with "H£ Hop") as ">[[] _]".
+    - (* c = [c0] : vec is [cell ∗ True]; weaken guard. *)
+      rewrite /heap.heap_mapsto_cells_val_vec /heap.heap_mapsto_cells_fancy_vec /=.
+      iAssert (G &&{↑NllftG; d}&&>
+               heap.heap_mapsto_cells_fancy l c0 (heap.FVal w))%I as "#Hguard'".
+      { iApply (guards_weaken_rhs_sep_l with "Hguard"). }
+      iApply (wp_read_guarded_cell with "[$Hguard' $HG $H£]"); [done|].
+      iIntros "!> HG". by iApply "HΦ".
+    - (* c = c0 :: c1 :: c2 : inner part is False. *)
+      iApply fupd_pgl_wp.
+      iMod (guards_open_later _ _ E (↑NllftG) d with "Hguard HG")
+        as "Hop"; first solve_ndisj.
+      iMod (lc_fupd_elim_laterN with "H£ Hop") as ">[Hvec _]".
+      rewrite /heap.heap_mapsto_cells_val_vec /heap.heap_mapsto_cells_fancy_vec /=.
+      iDestruct "Hvec" as "[_ []]".
+  Qed.
+
+  (** [Write] through a leaf-guard:  given an abstract resource [G]
+      gated by [G &&{↑NllftG; d}&&> (l #↦_)] (cell-state) and the
+      current cell mapsto [l #↦ v'], spend [£(3*d+1)] later credits
+      and atomically write [v] over the cell.  [G] is returned with
+      the new cell mapsto [l #↦ v].
+
+      Mirrors upstream verisbelt's [wp_write_na_guarded] (eris-port:
+      atomic instead of non-atomic).  Built on top of [heap.heap_write]. *)
+  Lemma wp_write_guarded E (l: heap.cloc1) (w w': val) (G: iProp Σ) d s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    {{{ (G &&{↑NllftG; d}&&> heap.heap_complete_mapsto l) ∗ G
+        ∗ heap.heap_complete_mapsto_fancy l (heap.FVal w') ∗ £(3*d+1) }}}
+      Write (Lit (LitLoc l.1)) (of_val w) @ s; E
+    {{{ RET LitV LitPoison;
+        heap.heap_complete_mapsto_fancy l (heap.FVal w) ∗ G }}}.
+  Proof.
+    iIntros (HE Φ) "(#Hguard & HG & Hl & H£) HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]".
+    iMod (heap.heap_write σ1 l w' w E G d HE with "H£ Hσ Hguard HG Hl")
+      as "(%Hσl & Hσ & HG & Hl)".
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iSplit.
+    { iPureIntro. rewrite /head_reducible /=. rewrite to_of_val Hσl.
+      eexists (_, _). rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= to_of_val Hσl in Hstep.
+    apply dret_pos in Hstep as [= -> ->].
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iSplitL "Hσ Ht"; [by iFrame|].
+    iApply ("HΦ" with "[$Hl $HG]").
+  Qed.
+
+  (** Vector-form write through a leaf-guard.  Mirrors upstream's pattern
+      via [mapsto_vec_untether_singleton]: takes the [cloc]-level vec
+      fancy mapsto and the [cloc]-level leaf-guard, case-splits on the
+      trace list (deriving False for non-singleton), and on the singleton
+      case performs the atomic write returning the new vec fancy mapsto. *)
+  Lemma wp_write_guarded_singleton E (l: loc) (c: list (list cell_id))
+                                   (w w': val) (G: iProp Σ) d s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    {{{ (G &&{↑NllftG; d+1}&&> heap.heap_complete_mapsto_vec (l, c)) ∗ G
+        ∗ heap.heap_complete_mapsto_fancy_vec (l, c) [heap.FVal w']
+        ∗ £(3*(d+1)+1) }}}
+      Write (Lit (LitLoc l)) (of_val w) @ s; E
+    {{{ RET LitV LitPoison;
+        heap.heap_complete_mapsto_fancy_vec (l, c) [heap.FVal w] ∗ G }}}.
+  Proof.
+    iIntros (HE Φ) "(#Hguard & HG & Hvec & H£) HΦ".
+    destruct c as [|c0 [|c1 c2]].
+    - (* c = [] : vec is False. *)
+      rewrite /heap.heap_complete_mapsto_fancy_vec /=.
+      iDestruct "Hvec" as %[].
+    - (* c = [c0] : singleton, unfold to scalar and apply wp_write_guarded. *)
+      rewrite /heap.heap_complete_mapsto_vec /heap.heap_complete_mapsto_vec' /=.
+      rewrite /heap.heap_complete_mapsto_fancy_vec /heap.heap_complete_mapsto_fancy_vec' /=.
+      iDestruct "Hvec" as "[Hl _]".
+      iAssert (G &&{↑NllftG; d+1}&&> heap.heap_complete_mapsto (l, c0))%I as "#Hguard'".
+      { iApply (guards_weaken_rhs_sep_l with "Hguard"). }
+      iApply (wp_write_guarded _ (l, c0) w w' G (d+1) with "[$Hguard' $HG $Hl $H£]");
+        [done|].
+      iIntros "!> [Hl HG]". iApply "HΦ". iFrame "HG".
+      iSplit; last done. iFrame "Hl".
+    - (* c = c0 :: c1 :: c2 : inner part is False. *)
+      rewrite /heap.heap_complete_mapsto_fancy_vec /=.
+      iDestruct "Hvec" as "[_ []]".
+  Qed.
+
+  (** [Free]: deallocate a freeable region. *)
+  Lemma wp_free E (n : Z) l vl s :
+    ↑non_atomic_cell_map.naN ⊆ E →
+    n = length vl →
+    {{{ ▷ heap.heap_mapsto_vec l vl ∗ ▷ heap.heap_freeable l 1 (length vl) }}}
+      Free (Lit (LitInt n)) (Lit (LitLoc l)) @ s; E
+    {{{ RET LitV LitPoison; True }}}.
+  Proof.
+    iIntros (HE Hn Φ) "[>Hl >Hf] HΦ".
+    iApply wp_lift_atomic_head_step; [done|].
+    iIntros (ns σ1) "[Hσ Ht]".
+    iMod (heap.heap_free with "Hσ Hl Hf") as "(%Hpos & %Hbnd & Hσ)"; [done..|].
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iSplit.
+    { iPureIntro. rewrite /head_reducible /=. rewrite bool_decide_eq_true_2 //.
+      eexists (_, _).
+      rewrite dret_1_1 //. lra. }
+    iNext. iIntros (e2 σ2 Hstep). iMod "Hclose" as "_".
+    rewrite /ectx_language.head_step /= /head_step_prob /= in Hstep.
+    rewrite bool_decide_eq_true_2 in Hstep; last done.
+    apply dret_pos in Hstep as [= -> ->].
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hσ Ht". by iApply "HΦ".
+  Qed.
+
+  Lemma wp_cumulative_time_receipt1 E e Φ s :
+    to_val e = None → ↑advN ∪ ↑timeN ⊆ E →
+    time_ctx -∗
+    (⧗1 -∗ WP e @ s; E ∖ ↑advN {{ Φ }}) -∗
+    WP e @ s; E {{ Φ }}.
+  Proof.
+    iIntros (Hnv Hmask) "#TIME Hwp".
+    iApply wp_lift_step_fupd_glm; [done|].
+    iIntros (ns σ1 ε1) "[[Hσ Ht] Hε]".
+    iMod persistent_time_receipt_0 as "⧖0".
+    iMod (step_cumulative_time_receipt _ ns 0 with "TIME Ht ⧖0")
+      as "(%Hns1 & Htm1 & EnFalse & Hcum2 & Hclose)"; first set_solver.
+    (* Split ⧗(0+2) = ⧗2 into ⧗1 + ⧗1, give one to user. *)
+    replace (0 + 2)%nat with (1 + 1)%nat by lia.
+    iDestruct "Hcum2" as "[⧗1 _]".
+    iSpecialize ("Hwp" with "⧗1").
+    rewrite pgl_wp_unfold /pgl_wp_pre /= Hnv.
+    iMod ("Hwp" $! (ns - 1)%nat σ1 ε1 with "[$Hσ $Htm1 $Hε]") as "Hwp".
+    iModIntro.
+    iApply (glm_mono_pred with "[Hclose EnFalse] Hwp").
+    iIntros ([e2 σ2] ε2) "Hwp".
+    iIntros "credit". rewrite /num_laters_per_step /=.
+    (* Outer's credit: £(S sum_advance_credits(ns+1)) = £1 + £(sum_advance_credits(ns+1)). *)
+    iDestruct "credit" as "[Hc1 credit]".
+    rewrite (sum_advance_credits_ge1 (ns + 1)); last by lia.
+    (* credit : £(2^(S(ns+1)) * ac(2^(S(ns+1))) + sum_advance_credits(ns+1-1))
+       = £(2^(S(S ns)) * ac(2^(S(S ns))) + sum_advance_credits ns) *)
+    iDestruct "credit" as "[credit1 credit2]".
+    replace (ns + 1 - 1)%nat with ns by lia.
+    iCombine "credit2 Hc1" as "credit_inner".
+    (* credit_inner : £(S sum_advance_credits ns) = £(S num_laters_per_step (ns-1)) *)
+    rewrite /num_laters_per_step /=.
+    replace (ns - 1 + 1)%nat with ns by lia.
+    iMod ("Hwp" with "credit_inner") as "Hwp".
+    iIntros "!> !>". iMod "Hwp". iModIntro.
+    (* After peeling first step-fupd, Hwp : |={∅}▷=>^(num_laters_per_step (ns-1)) |={∅,E∖↑advN}=> ... *)
+    (* Goal: |={∅}▷=>^(num_laters_per_step ns) |={∅,E}=> ... *)
+    iApply (step_fupdN_nmono (sum_advance_credits ns)).
+    { rewrite /num_laters_per_step. lia. }
+    iApply (step_fupdN_wand with "Hwp"). iIntros ">([Hheap Ht] & Hε & Hwp_inner)".
+    replace (S (ns - 1)) with ns by lia.
+    iMod ("Hclose" with "[$Ht $EnFalse credit1]") as "Ht".
+    { iApply (lc_weaken with "credit1").
+      replace (ns + 1)%nat with (S ns) by lia.
+      reflexivity. }
+    iModIntro. iFrame "Hheap Ht Hε".
+    iApply (pgl_wp_mask_mono with "Hwp_inner"). set_solver.
+  Qed.
+
+  Lemma wp_persistent_time_receipt n E e Φ s :
+    to_val e = None → ↑advN ∪ ↑timeN ⊆ E →
+    time_ctx -∗
+    ⧖n -∗
+    (£(advance_credits n) -∗ ⧖(S n) -∗ WP e @ s; E ∖ ↑advN {{ Φ }}) -∗
+    WP e @ s; E {{ Φ }}.
+  Proof.
+    iIntros (Hnv Hmask) "#TIME #⧖n Hwp".
+    iApply (wp_cumulative_time_receipt1 with "TIME"); [done|done|].
+    iIntros "⧗1". iApply fupd_pgl_wp.
+    iMod (cumulative_persistent_time_receipt_get_credits with "TIME ⧗1 ⧖n")
+      as "[#⧖Sn H£]"; first solve_ndisj.
+    iModIntro.
+    replace (n + 1)%nat with (S n) by lia.
+    by iApply ("Hwp" with "H£ ⧖Sn").
+  Qed.
+
+  Lemma wp_write_guarded_more_credits E (l: heap.cloc1)
+        (w w': val) (G: iProp Σ) d d' s :
+    ↑non_atomic_cell_map.naN ∪ ↑timeN ⊆ E →
+    time_ctx -∗
+    {{{ (G &&{↑NllftG; d}&&> heap.heap_complete_mapsto l) ∗ G
+        ∗ heap.heap_complete_mapsto_fancy l (heap.FVal w') ∗ £(3*d+1) ∗ ⧖d' }}}
+      Write (Lit (LitLoc l.1)) (of_val w) @ s; E
+    {{{ RET LitV LitPoison;
+        heap.heap_complete_mapsto_fancy l (heap.FVal w) ∗ G ∗ £(6*d' + 1) }}}.
+  Proof.
+    iIntros (HE) "#TIME". iIntros (Φ) "!> (#Hguard & HG & Hl & H£ & #⧖d') HΦ".
+    iApply wp_lift_step_fupd_glm; [done|].
+    iIntros (ns σ1 ε1) "[[Hσ Ht] Hε]".
+    iMod cumulative_time_receipt_0 as "⧗0".
+    iMod (time_receipt_le' with "TIME Ht ⧖d' ⧗0") as "[%Htime [Ht _]]";
+      first solve_ndisj.
+    assert (↑non_atomic_cell_map.naN ⊆ E) as HE_na by solve_ndisj.
+    iMod (heap.heap_write σ1 l w' w E G d HE_na with "H£ Hσ Hguard HG Hl")
+      as "(%Hσl & Hσ & HG & Hl)".
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iApply (glm_prim_step (Write (Lit (LitLoc l.1)) (of_val w)) σ1).
+    iExists _, nnreal_zero, ε1.
+    iSplit.
+    { iPureIntro. apply head_prim_reducible.
+      eexists (_, _). rewrite /head_step_prob /= to_of_val Hσl.
+      rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    iSplit; [iPureIntro; simpl; lra|].
+    iSplit.
+    { iPureIntro. eapply pgl_pos_R, pgl_trivial. simpl; lra. }
+    iIntros (e2 σ2 [_ Hpos]) "!>".
+    (* Determinism: prim_step on Write at known location is dret. *)
+    simpl in Hpos.
+    assert (head_reducible (Write (Lit (LitLoc l.1)) (of_val w)) σ1) as Hred.
+    { eexists (_, _). rewrite /head_step_prob /= to_of_val Hσl.
+      rewrite dret_pmf_unfold bool_decide_eq_true_2 //. lra. }
+    pose proof (head_prim_step_eq _ _ Hred) as Heq.
+    rewrite Heq in Hpos.
+    rewrite /head_step /= /head_step_prob /= to_of_val Hσl in Hpos.
+    apply dret_pos in Hpos. inversion Hpos. subst e2 σ2.
+    iIntros "credit".
+    (* credit : £(S (num_laters_per_step ns)).  Extract £(6*d'+1). *)
+    assert (6*d' + 1 ≤ S (sum_advance_credits (ns + 1)))%nat as Hbound.
+    { assert (sum_advance_credits (ns + 1) =
+              ((2 ^ S (ns+1)) * advance_credits (2 ^ S (ns+1))
+                + sum_advance_credits ns)%nat) as HSAC.
+      { rewrite (sum_advance_credits_ge1 (ns + 1)); last lia.
+        replace (ns + 1 - 1)%nat with ns by lia. reflexivity. }
+      rewrite HSAC.
+      assert (d' ≤ 2 ^ S (ns+1))%nat as Hd'.
+      { rewrite Nat.add_0_r in Htime.
+        eapply Nat.le_trans; [exact Htime|].
+        apply Nat.pow_le_mono_r; lia. }
+      assert (10 ≤ advance_credits (2 ^ S (ns+1)))%nat as Hac10.
+      { rewrite /advance_credits. lia. }
+      nia. }
+    iDestruct (lc_weaken (6*d' + 1) with "credit") as "H£6"; first exact Hbound.
+    iApply (step_fupdN_le 1 (S (num_laters_per_step ns))); [lia|done|].
+    iApply step_fupdN_intro; [done|]. simpl.
+    iNext. iMod "Hclose" as "_".
+    iMod (time_interp_step with "Ht") as "Ht".
+    iModIntro. iFrame "Hε".
+    iSplitL "Hσ Ht"; [by iFrame|].
+    change (Lit LitPoison) with (of_val (LitV LitPoison)).
+    iApply pgl_wp_value'. iApply ("HΦ" with "[$Hl $HG $H£6]").
+  Qed.
+
+End lifting.
+
+(** Tactic mirroring [clutch.prob_lang.class_instances.solve_pure_exec]:
+    use [case_match] + [simplify_eq] to destructure the [match]
+    expressions inside [head_step_prob], then close with [dret_1_1]. *)
+Local Ltac solve_exec_puredet :=
+  intros σ; simpl; (repeat case_match); simplify_eq;
+  rewrite dret_1_1 //.
+
+Local Ltac solve_exec_safe :=
+  intros σ; eexists (_, σ); simpl;
+  (repeat case_match); simplify_eq;
+  rewrite dret_1_1 //; lra.
+
+Local Ltac solve_pure_exec :=
+  intros _; apply nsteps_once;
+  apply pure_head_step_pure_step;
+  constructor; [solve_exec_safe | solve_exec_puredet].
+
+(** Beta reduction: [App (Rec f xl e) (of_val <$> vs) → e[f, xl ↦ ...]]. *)
 Class AsRec (e : expr) (f : binder) (xl : list binder) (erec : expr) :=
   as_rec : e = Rec f xl erec.
 Global Instance AsRec_rec f xl e : AsRec (Rec f xl e) f xl e := eq_refl.
+Global Instance AsRec_rec_val f xl e `{!Closed (f :b: xl +b+ []) e} :
+  AsRec (of_val (RecV f xl e)) f xl e := eq_refl.
 Global Instance AsRec_rec_locked_val v f xl e :
   AsRec (of_val v) f xl e → AsRec (of_val (locked v)) f xl e.
 Proof. by unlock. Qed.
 
-Class DoSubst (x : binder) (es : expr) (e er : expr) :=
-  do_subst : subst' x es e = er.
-Global Hint Extern 0 (DoSubst _ _ _ _) =>
-  rewrite /DoSubst; simpl_subst; reflexivity : typeclass_instances.
+(** [AsVal e] says [e] is the [of_val] of some value — used in [pure_rec]
+    to assert all argument expressions are values. *)
+Class AsVal (e : expr) := as_val : ∃ v, of_val v = e.
+Global Instance AsVal_lit l : AsVal (Lit l).
+Proof. by exists (LitV l). Qed.
+Global Instance AsVal_of_val v : AsVal (of_val v).
+Proof. by exists v. Qed.
 
 Class DoSubstL (xl : list binder) (esl : list expr) (e er : expr) :=
   do_subst_l : subst_l xl esl e = Some er.
-Global Instance do_subst_l_nil e : DoSubstL [] [] e e.
-Proof. done. Qed.
-Global Instance do_subst_l_cons x xl es esl e er er' :
-  DoSubstL xl esl e er' → DoSubst x es er' er →
-  DoSubstL (x :: xl) (es :: esl) e er.
-Proof. rewrite /DoSubstL /DoSubst /= => -> <- //. Qed.
-Global Instance do_subst_vec xl (vsl : vec val (length xl)) e :
-  DoSubstL xl (of_val <$> vec_to_list vsl) e (subst_v xl vsl e).
-Proof. by rewrite /DoSubstL subst_v_eq. Qed.
+Global Hint Extern 0 (DoSubstL [] [] _ _) => exact eq_refl : typeclass_instances.
+Global Hint Extern 1 (DoSubstL (_ :: _) (_ :: _) _ _) =>
+  rewrite /DoSubstL; cbn; reflexivity : typeclass_instances.
 
-Section lifting.
-Context `{!lrustGS Σ}.
-Implicit Types P Q : iProp Σ.
-Implicit Types e : expr.
-Implicit Types ef : option expr.
+(** Recursive [DoSubstL] step.  Lets typeclass resolution peel a single
+    [(b, e)] off the front and recurse on the remaining tail —
+    crucially, the tail need not be syntactic [_ :: _], so this works
+    when the tail is a [plistc binder _] / [map of_val plistc] that
+    only reduces via a separate base-case instance (e.g.
+    [function.do_subst_plv]). *)
+Global Instance do_subst_l_cons_step (b : binder) (e : expr)
+    (bl : list binder) (esl : list expr) (body result : expr) :
+  DoSubstL bl esl body result →
+  DoSubstL (b :: bl) (e :: esl) body (subst' b e result) | 5.
+Proof. rewrite /DoSubstL /= => ->. done. Qed.
 
-Local Open Scope nat_scope.
+(** Companion typeclass instances for [pure_rec] resolution on
+    applications of the form [(rec: f xl := e)%V (map of_val vsl)]
+    where [vsl] is a *symbolic* [vec val (length xl)] (typical of
+    continuation bodies in [typing/cont.v]).
 
-Lemma sqr_bound (n: nat) :
-    (2 ^ (S n) * 2^ (S n) ≤ (sum_advance_credits (n + 1))).
+    Upstream verusbelt (iris-WP) got these "for free" via
+    [iris.program_logic.{language,lifting}]: the iris-side
+    [Class AsVal] has [Global Instance as_vals_of_val :
+    TCForall AsVal (of_val <$> vs)] (language.v:271), and iris's
+    [lifting.v] provides [DoSubstL xl (of_val <$> vec_to_list vsl)
+    e (subst_v xl vsl e)] as a global instance.  When ported to pgl_wp,
+    we re-defined [AsVal] [DoSubstL] locally above without those companions.
+
+    Without these instances, [wp_rec] / [wp_pure (App _ _)] fires
+    [pure_rec] which then can't resolve [TCForall AsVal (map of_val
+    vsl)] (Coq's typeclass search doesn't unfold [map] for symbolic
+    [vsl]) and can't resolve [DoSubstL] (the default [Hint Extern]
+    runs [cbn; reflexivity] which can't reduce [subst_l] on a
+    symbolic vec).  The two instances + the [Closed]-by-assumption
+    hint below close all three holes. *)
+Global Instance TCForall_AsVal_map_of_val (vl : list val) :
+  TCForall AsVal (map of_val vl).
+Proof. induction vl as [|v vl IH]; constructor; [exact _|exact IH]. Qed.
+
+Global Instance TCForall_AsVal_vec_of_val {n} (vl : vec val n) :
+  TCForall AsVal (map of_val (vec_to_list vl)).
+Proof. apply TCForall_AsVal_map_of_val. Qed.
+
+Global Instance do_subst_l_rec_vec (kb : binder) (bl : list binder)
+    (k : val) (vsl : vec val (length bl)) e :
+  DoSubstL (kb :: bl) (of_val k :: map of_val (vec_to_list vsl)) e
+           (subst' kb (of_val k) (subst_v bl vsl e)).
 Proof.
-  destruct n.
-  - cbn; lia.
-  - rewrite Nat.add_1_r.
-    cbn [sum_advance_credits Nat.pow].
-    rewrite /advance_credits.
-    nia.
+  rewrite /DoSubstL /=.
+  pose proof (subst_v_eq bl vsl e) as Heq.
+  unfold subst_v in *. rewrite -Heq /=. done.
 Qed.
 
-Lemma Sexp_le_exp_S_lemma (n: nat) :
-    (S (2 ^ (S n))) ≤ (2 ^ (S (S n))).
-Proof.
-    cbn.
-    assert (2 ^ n ≥ 1) as H1; last by lia.
-    induction n; cbn; nia.
-Qed.
-    
-Lemma sqr_bound' (n: nat) :
-    ((2 ^ (S (S n))) * ((2^ (S (S n)))) ≤ (sum_advance_credits (n + 1))).
-Proof.
-  destruct n.
-  - cbn; lia.
-  - rewrite Nat.add_1_r.
-    cbn [sum_advance_credits Nat.pow].
-    rewrite /advance_credits.
-    nia.
-Qed.
-
-Lemma sqr_bound'' (n: nat) :
-    (S (2 ^ (S n)) * (S (2^ (S n))) ≤ (sum_advance_credits (n + 1))).
-Proof.
-    assert (0 ≤ S (2 ^ (S n))) as H1. { nia. }
-    assert (∀ x y z, 0 ≤ x → x ≤ y → y * y ≤ z → x * x ≤ z) as H. { intros. nia. }
-    apply (H _ _ _ H1 (Sexp_le_exp_S_lemma n) (sqr_bound' n)).
-Qed.
-
-Lemma wp_step_fupdN_time_receipt n m E1 E2 e P Φ :
-  TCEq (to_val e) None → E2 ⊆ E1 → ↑advN ∪ ↑timeN ⊆ E1 →
-  time_ctx -∗ ⧖n -∗
-    (⧗m ∧ ((|={E1∖E2,∅}=> |={∅}▷=>^(S ((n + m) * (n + m))) |={∅,E1∖E2}=> P) ∗
-           WP e @ E2 {{ v, P ={E1}=∗ Φ v }})) -∗
-  WP e @ E1 {{ Φ }}.
-Proof.
-  iIntros (???) "#TIME #Hn H".
-  iApply (wp_step_fupdN (S ((n + m) * (n + m))) _ _ E2)=>//. iSplit.
-  - iIntros "* [_ Ht]". iMod (time_receipt_le with "TIME Ht Hn [H]") as "[% ?]"=>//.
-    + iDestruct "H" as "[$ _]".
-    + iApply fupd_mask_weaken.
-      2: { iIntros "_ !> !% /=". 
-           have Hx := sqr_bound ns.
-           nia.
-      }
-      set_solver.
-  - iDestruct "H" as "[_ $]".
-Qed.
-
-Lemma wp_step_fupdN_time_receipt' n m E1 E2 e P Φ :
-  TCEq (to_val e) None → E2 ⊆ E1 → ↑advN ∪ ↑timeN ⊆ E1 →
-  time_ctx -∗ ⧖n -∗
-    (⧗m ∧ ((|={E1∖E2,∅}=> |={∅}▷=>^((S ((S (n + m)) * S (n + m)))) |={∅,E1∖E2}=> P) ∗
-           WP e @ E2 {{ v, P ={E1}=∗ Φ v }})) -∗
-  WP e @ E1 {{ Φ }}.
-Proof.
-  iIntros (???) "#TIME #Hn H".
-  iApply (wp_step_fupdN (S (((S (n + m)) * S (n + m)))) _ _ E2)=>//. iSplit.
-  - iIntros "* [_ Ht]". iMod (time_receipt_le with "TIME Ht Hn [H]") as "[% ?]"=>//.
-    + iDestruct "H" as "[$ _]".
-    + iApply fupd_mask_weaken.
-      2: { iIntros "_ !> !% /=". 
-           have Hx := sqr_bound'' ns.
-           nia.
-      }
-      set_solver.
-  - iDestruct "H" as "[_ $]".
-Qed.
-
-Lemma wp_step_fupdN_persistent_time_receipt n E1 E2 e P Φ :
-  TCEq (to_val e) None → E2 ⊆ E1 → ↑advN ∪ ↑timeN ⊆ E1 →
-  time_ctx -∗ ⧖n -∗ (|={E1∖E2,∅}=> |={∅}▷=>^(S (n * n)) |={∅, E1∖E2}=> P) -∗
-  WP e @ E2 {{ v, P ={E1}=∗ Φ v }} -∗
-  WP e @ E1 {{ Φ }}.
-Proof. 
-  iIntros (???) "#TIME #Hn HP Hwp".
-  iApply (wp_step_fupdN_time_receipt _ _ E1 E2 with "TIME Hn [> -]")=>//.
-  iMod cumulative_time_receipt_0 as "$". iFrame. by rewrite -plus_n_O.
-Qed.
-
-
-Lemma wp_step_fupdN_persistent_time_receipt' n E1 E2 e P Φ :
-  TCEq (to_val e) None → E2 ⊆ E1 → ↑advN ∪ ↑timeN ⊆ E1 →
-  time_ctx -∗ ⧖n -∗ (|={E1∖E2,∅}=> |={∅}▷=>^(S ((S n) * (S n))) |={∅, E1∖E2}=> P) -∗
-  WP e @ E2 {{ v, P ={E1}=∗ Φ v }} -∗
-  WP e @ E1 {{ Φ }}.
-Proof. 
-  iIntros (???) "#TIME #Hn HP Hwp".
-  iApply (wp_step_fupdN_time_receipt' _ _ E1 E2 with "TIME Hn [> -]")=>//.
-  iMod cumulative_time_receipt_0 as "$". iFrame. by rewrite -plus_n_O.
-Qed.
-
-Lemma wp_cumulative_time_receipt_linear E e Φ d :
-  TCEq (to_val e) None → ↑advN ∪ ↑timeN ⊆ E →
-  time_ctx -∗
-  ⧖d -∗
-  (⧗(S (S d)) -∗ WP e @ (E∖↑advN) {{ v, Φ v }}) -∗
-  WP e @ E {{ Φ }}. 
-Proof.
-  rewrite !wp_unfold /wp_pre /=. iIntros (-> ?) "#TIME ⧖ Hwp".
-  iIntros (?????) "[Hσ Ht]".
-  iMod (step_cumulative_time_receipt with "TIME Ht ⧖") as "[%ns1 [Ht [EnFalse [⧗ Hclose]]]]"=>//. { solve_ndisj. }
-  replace (d + 2) with (S (S d)) by lia.
-  (* iDestruct "⧗" as "[⧗ ⧗1 ]". *)
-  iDestruct ("Hwp" with "⧗") as "Hwp".
-  iMod ("Hwp" $! _ (ns-1)%nat _ [] 0%nat with "[$]") as "[$ Hwp]".
-  iIntros "!>" (e2 σ2 efs stp) "credit".
-  iDestruct "credit" as "[Hc1 credit]".
-  rewrite (sum_advance_credits_ge1 (ns+1)); last by lia.
-  iDestruct "credit" as "[credit1 credit2]".
-  iCombine "credit2 Hc1" as "credit2".
-  replace (ns - 1 + 1)%nat with ns by lia.
-  replace (ns + 1 - 1)%nat with ns by lia.
-  iMod ("Hwp" $! e2 σ2 efs stp with "credit2") as "Hwp".
-  iIntros "!> !>". iMod "Hwp". iModIntro.
-  iApply (step_fupdN_nmono (sum_advance_credits (ns))); first by lia.
-  iApply (step_fupdN_wand with "Hwp"). iIntros ">([$ Ht] & Hwp & $)".
-  replace (S (ns - 1))%nat with ns by lia.
-  iMod ("Hclose" with "[EnFalse Ht credit1]") as "?". {
-    iFrame. iApply (lc_weaken with "credit1"). 
-    rewrite !Nat.add_1_r.
-    cbn [Nat.pow].
-    opose proof (advance_credits_mono (2 * 2 ^ ns) (2 * (2 * 2 ^ ns)) _);nia.
-  }
-  iFrame.
-  iApply (wp_wand with "[Hwp]"); [iApply (wp_mask_mono with "Hwp"); solve_ndisj|].
-  iIntros "!> % H". by iApply "H".
-Qed.
-
-Lemma wp_cumulative_time_receipt2 E e Φ :
-  TCEq (to_val e) None → ↑advN ∪ ↑timeN ⊆ E →
-  time_ctx -∗
-  (⧗2 -∗ WP e @ (E∖↑advN) {{ v, Φ v }}) -∗
-  WP e @ E {{ Φ }}. 
-Proof.
-  rewrite !wp_unfold /wp_pre /=. iIntros (-> ?) "#TIME Hwp".
-  iIntros (?????) "[Hσ Ht]".
-  iMod persistent_time_receipt_0 as "⧖".
-  iMod (step_cumulative_time_receipt with "TIME Ht ⧖") as "[%ns1 [Ht [EnFalse [[⧗1 ⧗2] Hclose]]]]"=>//. { solve_ndisj. }
-  iDestruct ("Hwp" with "⧗2") as "Hwp".
-  iMod ("Hwp" $! _ (ns-1)%nat _ [] 0%nat with "[$]") as "[$ Hwp]".
-  iIntros "!>" (e2 σ2 efs stp) "credit".
-  iDestruct "credit" as "[Hc1 credit]".
-  rewrite (sum_advance_credits_ge1 (ns+1)); last by lia.
-  iDestruct "credit" as "[credit1 credit2]".
-  iCombine "credit2 Hc1" as "credit2".
-  replace (ns - 1 + 1)%nat with ns by lia.
-  replace (ns + 1 - 1)%nat with ns by lia.
-  iMod ("Hwp" $! e2 σ2 efs stp with "credit2") as "Hwp".
-  iIntros "!> !>". iMod "Hwp". iModIntro.
-  iApply (step_fupdN_nmono (sum_advance_credits (ns))); first by lia.
-  iApply (step_fupdN_wand with "Hwp"). iIntros ">([$ Ht] & Hwp & $)".
-  replace (S (ns - 1))%nat with ns by lia.
-  iMod ("Hclose" with "[EnFalse Ht credit1]") as "?". {
-    iFrame. iApply (lc_weaken with "credit1"). 
-    rewrite !Nat.add_1_r.
-    cbn [Nat.pow].
-    opose proof (advance_credits_mono (2 * 2 ^ ns) (2 * (2 * 2 ^ ns)) _);nia.
-  }
-  iFrame.
-  iApply (wp_wand with "[Hwp]"); [iApply (wp_mask_mono with "Hwp"); solve_ndisj|].
-  iIntros "!> % H". by iApply "H".
-Qed.
-
-Lemma wp_cumulative_time_receipt1 E e Φ :
-  TCEq (to_val e) None → ↑advN ∪ ↑timeN ⊆ E →
-  time_ctx -∗ 
-  (⧗1 -∗ WP e @ (E∖↑advN) {{ v, Φ v }}) -∗
-  WP e @ E {{ Φ }}.
-Proof.
-  rewrite !wp_unfold /wp_pre /=. iIntros (-> ?) "#TIME Hwp".
-  iIntros (?????) "[Hσ Ht]".
-  iMod persistent_time_receipt_0 as "⧖".
-  iMod (step_cumulative_time_receipt with "TIME Ht ⧖") as "[%ns1 [Ht [EnFalse [[_ ⧗ ] Hclose]]]]"=>//. { solve_ndisj. }
-  replace 2 with (1+1) by lia.
-  iDestruct "⧗" as "[⧗ _]".
-  iDestruct ("Hwp" with "⧗") as "Hwp".
-  iMod ("Hwp" $! _ (ns-1)%nat _ [] 0%nat with "[$]") as "[$ Hwp]".
-  iIntros "!>" (e2 σ2 efs stp) "credit".
-  iDestruct "credit" as "[Hc1 credit]".
-  rewrite (sum_advance_credits_ge1 (ns+1)); last by lia.
-  iDestruct "credit" as "[credit1 credit2]".
-  iCombine "credit2 Hc1" as "credit2".
-  replace (ns - 1 + 1)%nat with ns by lia.
-  replace (ns + 1 - 1)%nat with ns by lia.
-  iMod ("Hwp" $! e2 σ2 efs stp with "credit2") as "Hwp".
-  iIntros "!> !>". iMod "Hwp". iModIntro.
-  iApply (step_fupdN_nmono (sum_advance_credits (ns))); first by lia.
-  iApply (step_fupdN_wand with "Hwp"). iIntros ">([$ Ht] & Hwp & $)".
-  replace (S (ns - 1))%nat with ns by lia.
-  iMod ("Hclose" with "[EnFalse Ht credit1]") as "?". {
-    iFrame. iApply (lc_weaken with "credit1"). 
-    rewrite !Nat.add_1_r.
-    cbn [Nat.pow].
-    nia.
-  }
-  iFrame.
-  iApply (wp_wand with "[Hwp]"); [iApply (wp_mask_mono with "Hwp"); solve_ndisj|].
-  iIntros "!> % H". by iApply "H".
-Qed.
-
-Lemma wp_persistent_time_receipt n E e Φ :
-  TCEq (to_val e) None → ↑advN ∪ ↑timeN ⊆ E →
-  time_ctx -∗
-  ⧖n -∗
-  (£(advance_credits n) -∗ ⧖(S n) -∗ WP e @ (E∖↑advN) {{ v, Φ v }}) -∗
-  WP e @ E {{ Φ }}.
-Proof.
-  intros tceq Hmask. iIntros "#TIME #⧖ Hwp".
-  iApply wp_cumulative_time_receipt1; trivial.
-  iIntros "⧗".
-  iMod (cumulative_persistent_time_receipt_get_credits with "TIME ⧗ ⧖") as "[⧖S £]"; first by solve_ndisj.
-  replace (n+1)%nat with (S n) by lia.
-  iApply ("Hwp" with "£ ⧖S").
-Qed.
-
-(** Pure reductions *)
-Local Ltac solve_exec_safe :=
-  intros; destruct_and?; subst; do 3 eexists; econstructor; simpl; eauto with lia.
-Local Ltac solve_exec_puredet :=
-  simpl; intros; destruct_and?; inv_head_step; inv_bin_op_eval; inv_lit; done.
-Local Ltac solve_pure_exec :=
-  intros ?; apply nsteps_once, pure_base_step_pure_step;
-    constructor; [solve_exec_safe | solve_exec_puredet].
+(** Let typeclass search use [Closed] *hypotheses* from the proof
+    context.  [pure_rec] has a [Closed (f :b: xl +b+ []) erec]
+    premise; for a *symbolic* [erec] (typical of continuation
+    bodies) the default [solve_closed] tactic can't fire, but the
+    Coq-level [Closed] hypothesis bound at the lemma statement is
+    available to [assumption]. *)
+Global Hint Extern 1 (Closed _ _) => assumption : typeclass_instances.
 
 Global Instance pure_rec e f xl erec erec' el :
   AsRec e f xl erec →
@@ -322,413 +574,85 @@ Global Instance pure_rec e f xl erec erec' el :
   DoSubstL (f :: xl) (e :: el) erec erec' →
   PureExec True 1 (App e el) erec'.
 Proof.
-  rewrite /AsRec /DoSubstL=> -> /TCForall_Forall Hel ??. solve_pure_exec.
-  eapply Forall_impl; [exact Hel|]. intros e' [v <-]. rewrite to_of_val; eauto.
+  rewrite /AsRec /DoSubstL=> -> /TCForall_Forall Hel ? Hsubst.
+  assert (Hguard : Forall (λ ei, is_Some (to_val ei)) el ∧
+                   Closed (f :b: xl +b+ []) erec).
+  { split; [|done]. eapply Forall_impl; [exact Hel|].
+    intros e' [v <-]. eexists. apply to_of_val. }
+  intros _. apply nsteps_once. apply pure_head_step_pure_step.
+  assert (Hgoal : ∀ σ,
+    head_step_prob (App (Rec f xl erec) el) σ = dret (erec', σ)).
+  { intros σ. rewrite /head_step_prob.
+    rewrite (bool_decide_eq_true_2 _ Hguard). by rewrite Hsubst. }
+  constructor.
+  - intros σ. eexists (erec', σ).
+    change (head_step_prob (App (Rec f xl erec) el) σ (erec', σ) > 0).
+    rewrite Hgoal. rewrite dret_1_1 //. lra.
+  - intros σ.
+    change (head_step_prob (App (Rec f xl erec) el) σ (erec', σ) = 1).
+    rewrite Hgoal. apply dret_1_1; reflexivity.
 Qed.
-
-Close Scope nat_scope.
 
 Global Instance pure_le n1 n2 :
   PureExec True 1 (BinOp LeOp (Lit (LitInt n1)) (Lit (LitInt n2)))
-                  (Lit (bool_decide (n1 ≤ n2))).
-Proof. solve_pure_exec. Qed.
+                  (Lit (lit_of_bool (bool_decide (n1 ≤ n2)%Z))).
+Proof.
+  intros _. apply nsteps_once. apply pure_head_step_pure_step.
+  constructor.
+  - intros σ. eexists (_, σ). simpl. (repeat case_match); simplify_eq.
+    rewrite dret_1_1 //. lra.
+  - intros σ. simpl. (repeat case_match); simplify_eq.
+    rewrite dret_1_1 //.
+Qed.
 
-Global Instance pure_eq_int n1 n2 :
-  PureExec True 1 (BinOp EqOp (Lit (LitInt n1)) (Lit (LitInt n2))) (Lit (bool_decide (n1 = n2))).
-Proof. case_bool_decide; solve_pure_exec. Qed.
-
-Global Instance pure_eq_loc_0_r l :
-  PureExec True 1 (BinOp EqOp (Lit (LitLoc l)) (Lit (LitInt 0))) (Lit false).
-Proof. solve_pure_exec. Qed.
-
-Global Instance pure_eq_loc_0_l l :
-  PureExec True 1 (BinOp EqOp (Lit (LitInt 0)) (Lit (LitLoc l))) (Lit false).
-Proof. solve_pure_exec. Qed.
+Global Instance pure_eq_int z1 z2 :
+  PureExec True 1 (BinOp EqOp (Lit (LitInt z1)) (Lit (LitInt z2)))
+                  (Lit (lit_of_bool (bool_decide (z1 = z2)%Z))).
+Proof.
+  intros _. apply nsteps_once. apply pure_head_step_pure_step.
+  constructor.
+  - intros σ. eexists (_, σ). simpl.
+    destruct z1; cbn -[bool_decide]; by rewrite dret_1_1; first lra.
+  - intros σ. simpl.
+    destruct z1; cbn -[bool_decide]; by rewrite dret_1_1.
+Qed.
 
 Global Instance pure_plus z1 z2 :
-  PureExec True 1 (BinOp PlusOp (Lit $ LitInt z1) (Lit $ LitInt z2)) (Lit $ LitInt $ z1 + z2).
+  PureExec True 1 (BinOp PlusOp (Lit (LitInt z1)) (Lit (LitInt z2)))
+                  (Lit (LitInt (z1 + z2)%Z)).
 Proof. solve_pure_exec. Qed.
 
 Global Instance pure_minus z1 z2 :
-  PureExec True 1 (BinOp MinusOp (Lit $ LitInt z1) (Lit $ LitInt z2)) (Lit $ LitInt $ z1 - z2).
+  PureExec True 1 (BinOp MinusOp (Lit (LitInt z1)) (Lit (LitInt z2)))
+                  (Lit (LitInt (z1 - z2)%Z)).
 Proof. solve_pure_exec. Qed.
 
 Global Instance pure_mult z1 z2 :
-  PureExec True 1 (BinOp MultOp (Lit $ LitInt z1) (Lit $ LitInt z2)) (Lit $ LitInt $ z1 * z2).
+  PureExec True 1 (BinOp MultOp (Lit (LitInt z1)) (Lit (LitInt z2)))
+                  (Lit (LitInt (z1 * z2)%Z)).
 Proof. solve_pure_exec. Qed.
 
-Global Instance pure_offset l z  :
-  PureExec True 1 (BinOp OffsetOp (Lit $ LitLoc l) (Lit $ LitInt z)) (Lit $ LitLoc $ l +ₗ z).
+Global Instance pure_offset l z :
+  PureExec True 1 (BinOp OffsetOp (Lit (LitLoc l)) (Lit (LitInt z)))
+                  (Lit (LitLoc (shift_loc l z))).
 Proof. solve_pure_exec. Qed.
 
-Global Instance pure_case i e el :
-  PureExec (0 ≤ i ∧ el !! (Z.to_nat i) = Some e) 1 (Case (Lit $ LitInt i) el) e | 10.
-Proof. solve_pure_exec. Qed.
+Global Instance pure_case (i : Z) e el :
+  PureExec ((0 ≤ i)%Z ∧ el !! Z.to_nat i = Some e) 1
+           (Case (Lit (LitInt i)) el) e | 10.
+Proof.
+  intros [Hi Heq]. apply nsteps_once. apply pure_head_step_pure_step.
+  constructor.
+  - intros σ. eexists (e, σ). simpl.
+    rewrite (bool_decide_true _ Hi) Heq. rewrite dret_1_1 //. lra.
+  - intros σ. simpl. rewrite (bool_decide_true _ Hi) Heq.
+    apply dret_1_1; reflexivity.
+Qed.
 
-Global Instance pure_if b e1 e2 :
+Global Instance pure_if (b : bool) e1 e2 :
   PureExec True 1 (If (Lit (lit_of_bool b)) e1 e2) (if b then e1 else e2) | 1.
-Proof. destruct b; solve_pure_exec. Qed.
-
-Lemma wp_nd_int E :
-  {{{ True }}} NdInt @ E
-  {{{ z, RET LitV $ LitInt z; True }}}.
 Proof.
-  iIntros (? _) "Φ". iApply wp_lift_atomic_base_step_no_fork; auto.
-  iIntros (σ1 stepcnt κ κs n') "[σ t] !>"; iSplit. { unshelve auto. apply 0. }
-  iNext; iIntros (v2 σ2 efs Hstep); inv_head_step.
-  iMod (time_interp_step with "t") as "$". iFrame "σ". iIntros "credit".
-  by iDestruct ("Φ" with "[//]") as "$".
+  intros _. destruct b; (apply nsteps_once; apply pure_head_step_pure_step;
+    constructor; [intros σ; eexists (_, σ); simpl; rewrite dret_1_1 //; lra
+                  |intros σ; simpl; apply dret_1_1; reflexivity]).
 Qed.
-
-(** Heap *)
-Lemma wp_alloc E (n : Z) :
-  0 < n →
-  {{{ True }}} Alloc (Lit $ LitInt n) @ E
-  {{{ l (sz: nat), RET LitV $ LitLoc l; ⌜n = sz⌝ ∗ †l…sz ∗ l ↦∗ repeat (LitV LitPoison) sz }}}.
-Proof.
-  iIntros (? Φ) "_ HΦ". iApply wp_lift_atomic_base_step_no_fork; auto.
-  iIntros (σ1 stepcnt κ κs n') "[Hσ Ht] !>"; iSplit; first by auto.
-  iNext; iIntros (v2 σ2 efs Hstep); inv_head_step.
-  iMod (heap_alloc with "Hσ") as "[$ Hl]"; [done..|].
-  iMod (time_interp_step with "Ht") as "$". iIntros "credit".
-  iModIntro; iSplit=> //. iApply ("HΦ" $! _ (Z.to_nat n)). auto with lia iFrame.
-Qed.
-
-Lemma wp_free E (n:Z) l vl :
-  ↑naN ⊆ E →
-  n = length vl →
-  {{{ ▷ l ↦∗ vl ∗ ▷ †l…(length vl) }}}
-    Free (Lit $ LitInt n) (Lit $ LitLoc l) @ E
-  {{{ RET LitV LitPoison; True }}}.
-Proof.
-  iIntros (Hmask ? Φ) "[>Hmt >Hf] HΦ". iApply wp_lift_atomic_base_step_no_fork; auto.
-  iIntros (σ1 stepcnt κ κs n') "[Hσ Ht]".
-  iMod (heap_free _ _ _ n with "Hσ Hmt Hf") as "(% & % & Hσ)"=>//.
-  iMod (time_interp_step with "Ht") as "$".
-  iModIntro; iSplit; first by auto.
-  iNext; iIntros (v2 σ2 efs Hstep); inv_head_step. iIntros "credit".
-  iModIntro; iSplit=> //. iFrame. iApply "HΦ"; auto.
-Qed.
-
-Lemma wp_read_sc_guarded_cells E l c v d G :
-  ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> l ↦[^ c] v) ∗ G ∗ £(d) }}} Read (Lit $ LitLoc l) @ E {{{ RET v; G }}}.
-Proof.
-  iIntros (Hmask Φ) "[#Gv [G £]] HΦ". iApply wp_lift_base_step; auto.
-  iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hσ & HhF & %REL & ato)".
-  iMod (atomic_read with "£ [Gv] G Hσ") as (n0) "[%Heq [rim Hσ]]". { trivial. } { rewrite /heap_mapsto_cells_fancy. unfold fv2sum. iFrame "Gv". }
-  iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit; first by eauto.
-  iNext; iIntros (e2 σ2 efs Hstep); inv_head_step. iMod "Hclose" as "_".
-  iMod (time_interp_step with "Ht") as "$". iIntros "credit !>". iFrame.
-  iSplit. { iPureIntro. eauto using heap_freeable_rel_stable. }
-  iSplit; last done.
-  (* clear dependent σ1 n. *)
-  iApply wp_value.
-  iApply ("HΦ" with "rim").
-Qed.
-
-Lemma wp_read_sc E l v :
-  ↑naN ⊆ E →
-  {{{ ▷ l ↦ v }}} Read (Lit $ LitLoc l) @ E
-  {{{ RET v; l ↦ v }}}.
-Proof.
-  iIntros (Hmask Φ) ">pt ToΦ".
-  iMod lc_zero as "£0".
-  iApply (wp_read_sc_guarded_cells E l [] v 0 with "[pt £0]"); trivial.
-  iFrame.
-  rewrite /heap_mapsto_cells_fancy /heap_mapsto /=.
-  iApply guards_refl.
-Qed.
-
-Lemma wp_read_na_guarded_cells E l c G v d :
-  ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> (l ↦[^ c] v)) ∗ G ∗ £(3*d) }}} Read (Lit $ LitLoc l) @ E
-  {{{ RET v; G }}}.
-Proof.
-  iIntros (Hmask Φ) "[#Gv [G £]] HΦ". iApply wp_lift_base_step; auto.
-  iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]". iDestruct "Hσ" as (hF) "(Hσ & HhF & %REL & ato)".
-  iDestruct (lc_weaken d with "£") as "£"; first lia.
-  iMod (atomic_read with "£ [Gv] G Hσ") as (n0) "[%Heq [rim Hσ]]". { trivial. }
-  { rewrite /heap_mapsto_cells_fancy. unfold fv2sum. iFrame "Gv". }
-  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
-  iSplit. { iPureIntro. eexists _, _, _, _. eapply ReadS; eauto. }
-  iNext; iIntros (e2 σ2 efs Hstep); inv_head_step. iMod "Hclose" as "_".
-  iMod (time_interp_step with "Ht") as "$". iIntros "credit !>". iFrame.
-  iSplit. { iPureIntro. eauto using heap_freeable_rel_stable. }
-  iSplit; last done.
-  iApply wp_value.
-  iApply ("HΦ" with "rim").
-Qed.
-
-(* Heap-Read *)
-Lemma wp_read_na_guarded_cells_0 E l c G v :
-  ↑naN ⊆ E →
-  {{{ (G &&{↑naN}&&> (l ↦[^ c] v)) ∗ G }}} Read (Lit $ LitLoc l) @ E
-  {{{ RET v; G }}}.
-Proof.
-  iIntros (Hmask 𝛷) "[g G]". iMod (lc_zero) as "£0".
-  iApply wp_read_na_guarded_cells; first trivial. iFrame "g G". done.
-Qed.
-
-Lemma wp_read_na E l v :
-  ↑naN ⊆ E →
-  {{{ ▷ l ↦ v }}} Read (Lit $ LitLoc l) @ E
-  {{{ RET v; l ↦ v }}}.
-Proof.
-  iIntros (Hmask Φ) ">pt ToΦ".
-  iMod lc_zero as "£0".
-  iApply (wp_read_na_guarded_cells E l [] (l ↦ v)%I v 0 with "[pt £0]"); trivial.
-  iFrame. iApply guards_refl.
-Qed.
-
-Lemma wp_read_na_guarded_cells_singleton E l c G v d :
-  ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> (l ↦[^ c]∗ [v])) ∗ G ∗ £(3*d) }}} Read (Lit $ LitLoc l) @ E
-  {{{ RET v; G }}}.
-Proof.
-  case: c=> >; last first.
-  { setoid_rewrite guards_weaken_rhs_sep_l. exact: wp_read_na_guarded_cells. }
-  iIntros (??) "(gd & G & £ & _) _".
-  iAssert (|={E}=> False)%I with "[gd G £]" as ">[]".
-  iMod (guards_open_later with "gd G") as "to"=>//.
-  iMod (lc_fupd_elim_laterN with "£ to") as ">[[] _]".
-Qed.
-
-Lemma wp_read_na_guarded E l G v d :
-  ↑naN ⊆ E →
-  {{{ (G &&{↑naN; d}&&> (l ↦ v)) ∗ G ∗ £(3*d) }}} Read (Lit $ LitLoc l) @ E
-  {{{ RET v; G }}}.
-Proof.
-  intros Hmask. have Ha := wp_read_na_guarded_cells_singleton E l [[]] G v d. simpl in Ha.
-  unfold heap_mapsto_cells_val_vec in Ha. simpl in Ha. unfold heap_mapsto_fancy_vec in Ha.
-  simpl in Ha. unfold heap_mapsto. setoid_rewrite bi.sep_True in Ha; last by apply _.
-  apply Ha. apply Hmask.
-Qed.
-
-
-(* The extra +1 in £ is problematic*)
-Lemma wp_write_sc_guarded E l c e v v' d G :
-  ↑naN ⊆ E →
-  IntoVal e v →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) }}} Write (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G }}}.
-Proof.
-  iIntros (Hmask <- Φ) "[#guards [G [Hv £]]] HΦ".
-  iApply wp_lift_base_step; auto. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by trivial.
-  iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose".
-    iSplit. { iPureIntro. eexists _, _, _, _. eapply WriteS; eauto. }
-  iNext; iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step. iMod "Hclose" as "_".
-  iMod (time_interp_step with "Ht") as "$". iModIntro. iFrame "Hσ". iSplit; last done.
-  clear dependent σ1.
-  iApply wp_value.
-  iApply ("HΦ" with "[$Hv' $G]").
-Qed.
-
-(* The extra £1 is the problem *)
-Lemma wp_write_sc E l e v v' :
-  ↑naN ⊆ E →
-  IntoVal e v →
-  {{{ ▷ l ↦ v' ∗ £1 }}} Write (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; l ↦ v }}}.
-Proof.
-  iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
-  (* iMod lc_zero as "£0". *)
-  iApply (wp_write_sc_guarded E l [] e v v' 0 (True)%I with "[pt £]"); trivial.
-   - iFrame. replace ((l, []) #↦_)%I with (True : iProp Σ)%I.
-     2: { unfold heap_complete_mapsto. simpl. trivial. }
-     iApply guards_true.
-   - iNext. iIntros "[A B]". iApply "ToΦ". rewrite heap_cloc1_mapsto_val. iFrame.
-Qed. 
-
-Lemma wp_write_na_guarded E l c e v v' d G :
-  ↑naN ⊆ E →
-  IntoVal e v →
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) }}} Write (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G }}}.
-Proof.
-  iIntros (Hmask <- Φ) "[#guards [G [Hv £]]] HΦ".
-  iApply wp_lift_base_step; auto. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by trivial.
-  iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose". iSplit.
-    { iPureIntro. eexists _, _, _, _. eapply WriteS; eauto. }
-  iNext; iIntros (e2 σ2 efs Hstep) "credit"; inv_head_step. iMod "Hclose" as "_".
-  iMod (time_interp_step with "Ht") as "$". iModIntro. iFrame "Hσ". iSplit; last done.
-  iApply wp_value. iApply "HΦ". iFrame.
-Qed.
-
-Lemma wp_write_na_guarded_0 E l cells e v v' d G :
-  ↑naN ⊆ E →
-  IntoVal e v →
-  {{{ (G &&{↑naN; d}&&> ((l,cells) #↦_)) ∗ G ∗ (l,cells) #↦ v' ∗ £(3*d+1) }}} Write (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; (l,cells) #↦ v ∗ G }}}.
-Proof.
-  iIntros (Hmask Hval 𝛷) "H HΦ".
-  iApply (wp_write_na_guarded with "H"); done.
-Qed.
-
-Local Open Scope nat_scope.
-
-Lemma wp_write_na_guarded_more_credits E l c e v v' d G d' :
-  ↑naN ∪ ↑timeN ⊆ E →
-  IntoVal e v →
-  time_ctx -∗
-  {{{ (G &&{↑naN; d}&&> ((l,c) #↦_)) ∗ G ∗ (l,c) #↦ v' ∗ £(3*d+1) ∗ ⧖(d') }}} Write (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; (l,c) #↦ v ∗ G ∗ £(6*d'+1) }}}.
-Proof.
-  iIntros (Hmask <-) "#TIME". iIntros (Φ). iModIntro.
-  iIntros "(#guards & G & Hv & £ & ⧖) HΦ".
-  rewrite !wp_unfold /wp_pre /=. iIntros (σ1 stepcnt κ κs n) "[Hσ Ht]".
-  iMod (heap_write _ _ _ v with "£ Hσ guards G Hv") as "(% & Hσ & G & Hv')"; first by set_solver.
-  iMod cumulative_time_receipt_0 as "⧗0".
-  iMod (time_receipt_le' with "TIME Ht ⧖ ⧗0") as "[%Htimebound [Ht ⧗0]]"; first by set_solver.
-  iApply (fupd_mask_intro _ ∅); first set_solver. iIntros "Hclose". iSplit.
-    { iPureIntro. apply base_prim_reducible. eexists _, _, _, _. eapply WriteS; eauto. }
-  iIntros (e2 σ2 efs Hstep) "credit". iModIntro. iNext. iModIntro.
-  iApply (step_fupdN_intro); first by set_solver. iNext. iMod "Hclose" as "_".
-  assert (base_step (Write (Lit (LitLoc l)) (of_val v)) σ1 κ e2 σ2 efs) as Hbasestep.
-    { apply base_reducible_prim_step; trivial. eexists _, _, _, _. eapply WriteS; eauto. }
-  inv_head_step.
-  iMod (time_interp_step with "Ht") as "$".
-  iModIntro.
-  iFrame "Hσ".
-  iSplit; last done.
-  iApply wp_value. iApply "HΦ". iFrame "Hv' G".
-  (* Extract £(6*d'+1) from the per-step credit budget. *)
-  iApply (lc_weaken with "credit").
-  rewrite Nat.add_1_r. cbn [sum_advance_credits].
-  assert (stepcnt + 1 = S stepcnt) as -> by lia. cbn [sum_advance_credits].
-  assert (d' ≤ 2 ^ S (S stepcnt)) as Hd'. { cbn [Nat.pow]. lia. }
-  rewrite /advance_credits. nia.
-Qed.
-  
-Lemma wp_write_na E l e v v' :
-  ↑naN ⊆ E →
-  IntoVal e v →
-  {{{ ▷ l ↦ v' ∗ £1 }}} Write (Lit $ LitLoc l) e @ E
-  {{{ RET LitV LitPoison; l ↦ v }}}.
-Proof.
-  iIntros (Hmask IntoVal Φ) "[>pt £] ToΦ".
-  iApply (wp_write_na_guarded E l [] e v v' 0 (True)%I with "[pt £]"); trivial.
-   - iFrame. replace ((l, []) #↦_)%I with (True : iProp Σ)%I.
-     2: { unfold heap_complete_mapsto. simpl. trivial. }
-     iApply guards_true.
-   - iNext. iIntros "[A B]". iApply "ToΦ". rewrite heap_cloc1_mapsto_val. iFrame.
-Qed.
-
-(* Heap-Move-Cell *)
-(*
-In practice, you'll usually want to use one of the "untether" lemmas directly, since these
-are more flexible because they let you separate the logical step of moving the cell from
-the physical steps of moving data. The proof here illustrates the concept.
-Also, this matches the special case presented in the paper.
-*)
-Lemma wp_cell_move_na E l l' cell v' :
-  ↑naN ⊆ E →
-  {{{ l ↦! (FCell cell) ∗ l' ↦ v' ∗ £1 }}} Write (Lit $ LitLoc l') (Read (Lit $ LitLoc l)) @ E
-  {{{ RET LitV LitPoison; ∃ v, l ↦ v ∗ l' ↦! (FCell cell) }}}.
-Proof.
-  intros Hmask. iIntros (𝛷) "(pt & pt' & £) post". iApply wp_fupd.
-  (* untether the cell from the location, get a concrete value v *)
-  iMod (mapsto_vec_untether1 (l, []) (FCell cell) with "pt") as (v) "[pt [retether ?]]".
-  (* copy the concrete value v *)
-  change (Write (Lit (LitLoc l')) (Read (Lit (LitLoc l))))
-      with (fill_item (WriteRCtx (LitV (LitLoc l'))) (Read (Lit (LitLoc l)))).
-  iApply wp_bind.
-  iApply (wp_read_na with "pt"); first trivial. iModIntro. iIntros "pt".
-  iApply (wp_write_na _ _ _ v with "[pt' £]"); [trivial|done| |].
-  { iFrame. }
-  (* retether the cell to the new location *)
-  iModIntro. iIntros "pt'".
-  iMod ("retether" $! (l', []) with "[pt']") as "[? pt']". { iSplitR. { done. }
-    unfold heap_complete_mapsto_fancy, split_at_last, rev. simpl.
-    unfold heap_mapsto. iFrame "pt'".
-  }
-  iModIntro. iApply "post". iFrame.
-Qed.
-
-Lemma wp_eq_loc E (l1 : loc) (l2: loc) v1 v2 P Φ :
-  ↑naN ⊆ E →
-  (P -∗ ▷ l1 ↦ v1) →
-  (P -∗ ▷ l2 ↦ v2) →
-  (P -∗ ▷ Φ (LitV (bool_decide (l1 = l2)))) →
-  P -∗ WP BinOp EqOp (Lit (LitLoc l1)) (Lit (LitLoc l2)) @ E {{ Φ }}.
-Proof.
-  iIntros (Hmask Hl1 Hl2 Hpost) "HP".
-  destruct (bool_decide_reflect (l1 = l2)) as [->|].
-  - iApply wp_lift_pure_det_base_step_no_fork';
-      [done|solve_exec_safe|solve_exec_puredet|].
-    iAssert (▷ (WP Lit true @ E {{ v, Φ v }}))%I with "[HP]" as "X".
-     + iApply wp_value. by iApply Hpost.
-     + iNext. iIntros. iFrame "X".
-  - iApply wp_lift_atomic_base_step_no_fork; subst=>//.
-    iIntros (σ1 stepcnt κ κs n') "[Hσ1 Ht]".
-    iMod (time_interp_step with "Ht") as "$".
-    iModIntro. inv_head_step. iSplitR.
-    { iPureIntro. repeat eexists. econstructor. eapply BinOpEqFalse. by auto. }
-    (* We need to do a little gymnastics here to apply Hne now and strip away a
-       ▷ but also have the ↦s. *)
-    iAssert ((▷ ∃ v, l1 ↦ v) ∧ (▷ ∃ v, l2 ↦ v) ∧ ▷ Φ (LitV false))%I
-      with "[HP]" as "HP".
-    { iSplit; last iSplit.
-      + iExists _. by iApply Hl1.
-      + iExists _. by iApply Hl2.
-      + by iApply Hpost. }
-    clear Hl1 Hl2. iNext. iIntros (e2 σ2 efs Hs) "£".
-    inv_head_step. iSplitR=>//. inv_bin_op_eval; inv_lit.
-    + iDestruct "HP" as "[Hl1 _]".
-      iDestruct "Hl1" as (?) "Hl1".
-      iMod (heap_read σ2 with "Hσ1 Hl1") as "[_ [_ %X]]"; first by set_solver.
-      destruct X as [n0 X]. exfalso. simplify_eq.
-    + iDestruct "HP" as "[_ [Hl2 _]]".
-      iDestruct "Hl2" as (?) "Hl2".
-      iMod (heap_read σ2 with "Hσ1 Hl2") as "[_ [_ %X]]"; first by set_solver.
-      destruct X as [n0 X]. exfalso. simplify_eq.
-    + iDestruct "HP" as "[_ [_ $]]". done.
-Qed.
-
-(** Proof rules for working on the n-ary argument list. *)
-Lemma wp_app_ind E f (el : list expr) (Ql : vec (val → iProp Σ) (length el)) vs Φ :
-  AsVal f →
-  ([∗ list] eQ ∈ zip el Ql, WP eQ.1 @ E {{ eQ.2 }}) -∗
-    (∀ vl : vec val (length el), ([∗ list] vQ ∈ zip vl Ql, vQ.2 $ vQ.1) -∗
-                    WP App f (of_val <$> vs ++ vl) @ E {{ Φ }}) -∗
-    WP App f ((of_val <$> vs) ++ el) @ E {{ Φ }}.
-Proof.
-  intros [vf <-]. revert vs Ql.
-  induction el as [|e el IH]=>/= vs Ql; inv_vec Ql; simpl.
-  - iIntros "_ H". iSpecialize ("H" $! [#]). rewrite !app_nil_r /=. by iApply "H".
-  - iIntros (Q Ql) "[He Hl] HΦ".
-    change (App (of_val vf) ((of_val <$> vs) ++ e :: el))
-      with (fill_item (AppRCtx vf vs el) e).
-    iApply wp_bind. iApply (wp_wand with "He"). iIntros (v) "HQ /=".
-    rewrite cons_middle (assoc app) -(fmap_app _ _ [v]).
-    iApply (IH _ _ with "Hl"). iIntros "* Hvl". rewrite -assoc.
-    iApply ("HΦ" $! (v:::vl)). iFrame.
-Qed.
-
-Lemma wp_app_vec E f el (Ql : vec (val → iProp Σ) (length el)) Φ :
-  AsVal f →
-  ([∗ list] eQ ∈ zip el Ql, WP eQ.1 @ E {{ eQ.2 }}) -∗
-    (∀ vl : vec val (length el), ([∗ list] vQ ∈ zip vl Ql, vQ.2 $ vQ.1) -∗
-                    WP App f (of_val <$> (vl : list val)) @ E {{ Φ }}) -∗
-    WP App f el @ E {{ Φ }}.
-Proof. iIntros (Hf). by iApply (wp_app_ind _ _ _ _ []). Qed.
-
-Lemma wp_app (Ql : list (val → iProp Σ)) E f el Φ :
-  length Ql = length el → AsVal f →
-  ([∗ list] eQ ∈ zip el Ql, WP eQ.1 @ E {{ eQ.2 }}) -∗
-    (∀ vl : list val, ⌜length vl = length el⌝ -∗
-            ([∗ list] k ↦ vQ ∈ zip vl Ql, vQ.2 $ vQ.1) -∗
-             WP App f (of_val <$> (vl : list val)) @ E {{ Φ }}) -∗
-    WP App f el @ E {{ Φ }}.
-Proof.
-  iIntros (Hlen Hf) "Hel HΦ". rewrite -(vec_to_list_to_vec Ql).
-  generalize (list_to_vec Ql). rewrite Hlen. clear Hlen Ql=>Ql.
-  iApply (wp_app_vec with "Hel"). iIntros (vl) "Hvl".
-  iApply ("HΦ" with "[%] Hvl"). by rewrite length_vec_to_list.
-Qed.
-
-Close Scope nat_scope.
- 
-End lifting.

@@ -12,6 +12,10 @@ From lrust.lang Require Export lang.
 From iris.prelude Require Import options.
 Import uPred.
 
+Canonical Structure stateO := leibnizO state.
+Canonical Structure valO := leibnizO val.
+Canonical Structure exprO := leibnizO expr.
+
 Definition lock_stateR : cmra :=
   csumR (exclR unitO) natR.
 
